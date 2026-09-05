@@ -18,6 +18,7 @@ class ServerConfig(BaseSettings):
     auth_type: str = "api_key"
     api_key: Optional[str] = None
     base_url: str = "https://api.knowledgator.com"
+    request_timeout_ms: int = 60000
 
     def get_effective_api_key(self) -> Optional[str]:
         """Return API key from settings or fall back to environment variables."""

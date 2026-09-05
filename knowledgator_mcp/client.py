@@ -25,6 +25,7 @@ def get_kg_client(
             api_key=api_key,
             server_url=base_url,
             server_base_headers=headers,
+            timeout_ms=cfg.request_timeout_ms,
         )
         if server_config is None and auth_provider is None and not force_refresh:
             _client = client_inst
