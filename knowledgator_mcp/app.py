@@ -3,7 +3,7 @@ import argparse
 
 from mcp.server.fastmcp import FastMCP
 
-from knowledgator_mcp.tools import dataset_tools, inference_tools
+from knowledgator_mcp.tools import dataset_tools, inference_tools, finetuning_tools
 from knowledgator_mcp.client import close_kg_client
 from knowledgator_mcp.config import settings
 
@@ -17,6 +17,12 @@ mcp.tool()(dataset_tools.generate_dataset_plan)
 mcp.tool()(dataset_tools.start_dataset_generation)
 mcp.tool()(dataset_tools.list_datasets)
 mcp.tool()(dataset_tools.get_dataset_details)
+
+# Register Fine-Tuning Tools
+mcp.tool()(finetuning_tools.start_training_job)
+mcp.tool()(finetuning_tools.get_training_status)
+mcp.tool()(finetuning_tools.list_trainings)
+mcp.tool()(finetuning_tools.stop_training_job)
 
 # Register Inference Tools
 mcp.tool()(inference_tools.instruct_inference)
