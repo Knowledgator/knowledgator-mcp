@@ -3,7 +3,7 @@ import argparse
 
 from mcp.server.fastmcp import FastMCP
 
-from knowledgator_mcp.tools import inference_tools
+from knowledgator_mcp.tools import dataset_tools, inference_tools
 from knowledgator_mcp.client import close_kg_client
 from knowledgator_mcp.config import settings
 
@@ -12,6 +12,11 @@ mcp = FastMCP(
     debug=settings.debug,
 )
 
+# Register Dataset Tools
+mcp.tool()(dataset_tools.generate_dataset_plan)
+mcp.tool()(dataset_tools.start_dataset_generation)
+mcp.tool()(dataset_tools.list_datasets)
+mcp.tool()(dataset_tools.get_dataset_details)
 
 # Register Inference Tools
 mcp.tool()(inference_tools.instruct_inference)
