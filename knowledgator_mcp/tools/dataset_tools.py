@@ -1,5 +1,7 @@
 from typing import Any, Dict, List, Optional
 
+from mcp.server.fastmcp import Context
+
 from knowledgator_mcp.utils import serialize
 from knowledgator_mcp.client import get_client_context
 
@@ -8,6 +10,7 @@ async def generate_dataset_plan(
     prompt: str,
     dataset_type: str = "text-classification",
     target_format: str = "jsonl",
+    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """Generates a dataset creation plan based on a task prompt.
 
@@ -15,11 +18,12 @@ async def generate_dataset_plan(
         prompt: Detailed prompt describing the goal, target domain, and schema for the dataset.
         dataset_type: Type of task (e.g., 'text-classification', 'ner', 'relation-extraction').
         target_format: Desired dataset format ('jsonl', 'csv', 'parquet', 'json').
+        ctx: Optional FastMCP request context.
 
     Returns:
         Structured dataset generation plan with schema, sample structure, and execution steps.
     """
-    client, server_url, headers = get_client_context()
+    client, server_url, headers = get_client_context(ctx=ctx)
     if client.datasets is None:
         raise RuntimeError("Datasets API is not enabled for the current client configuration.")
 
@@ -43,6 +47,7 @@ async def start_dataset_generation(
     entity_types: Optional[List[str]] = None,
     json_template: Optional[str] = None,
     ner_output_format: Optional[str] = "simple",
+    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """Starts dataset generation / dataset creation pipeline on Knowledgator.
 
@@ -58,11 +63,12 @@ async def start_dataset_generation(
         entity_types: Optional list of entity tag strings (for NER / extract-it).
         json_template: Optional JSON schema template string (for text2json / instruct-it).
         ner_output_format: Output format for NER ('simple', etc.).
+        ctx: Optional FastMCP request context.
 
     Returns:
         Creation response with dataset ID and status.
     """
-    client, server_url, headers = get_client_context()
+    client, server_url, headers = get_client_context(ctx=ctx)
     if client.datasets is None:
         raise RuntimeError("Datasets API is not enabled for the current client configuration.")
 
@@ -92,6 +98,7 @@ async def list_datasets(
     limit: int = 20,
     name: Optional[str] = None,
     dataset_type: Optional[str] = None,
+    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """Lists datasets on the Knowledgator platform with optional filtering.
 
@@ -100,11 +107,12 @@ async def list_datasets(
         limit: Maximum number of datasets to return (default: 20).
         name: Optional filter by dataset name.
         dataset_type: Optional filter by service type ('ner', 'text-classification', 'relation-extraction').
+        ctx: Optional FastMCP request context.
 
     Returns:
         List of datasets with total count and pagination info.
     """
-    client, server_url, headers = get_client_context()
+    client, server_url, headers = get_client_context(ctx=ctx)
     if client.datasets is None:
         raise RuntimeError("Datasets API is not enabled for the current client configuration.")
     response = client.datasets.list(
@@ -118,16 +126,20 @@ async def list_datasets(
     return serialize(response)
 
 
-async def get_dataset_details(dataset_id: str) -> Dict[str, Any]:
+async def get_dataset_details(
+    dataset_id: str,
+    ctx: Optional[Context] = None,
+) -> Dict[str, Any]:
     """Gets details for a specific dataset by ID.
 
     Args:
         dataset_id: Unique identifier of the dataset.
+        ctx: Optional FastMCP request context.
 
     Returns:
         Dataset metadata, file counts, and processing status.
     """
-    client, server_url, headers = get_client_context()
+    client, server_url, headers = get_client_context(ctx=ctx)
     if client.datasets is None:
         raise RuntimeError("Datasets API is not enabled for the current client configuration.")
     response = client.datasets.get(

@@ -1,7 +1,9 @@
 from typing import Any, Dict, List, Optional
 
-from knowledgator_mcp.client import get_client_context
+from mcp.server.fastmcp import Context
+
 from knowledgator_mcp.utils import serialize
+from knowledgator_mcp.client import get_client_context
 
 
 async def instruct_inference(
@@ -10,6 +12,7 @@ async def instruct_inference(
     output_type: Optional[str] = None,
     model_id: Optional[str] = None,
     timeout_ms: Optional[int] = 60000,
+    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """Executes instruction task using Knowledgator Instruct API.
 
@@ -19,11 +22,12 @@ async def instruct_inference(
         output_type: Optional hint for desired output format (json, string, markdown, etc.).
         model_id: Optional model identifier override.
         timeout_ms: Optional request timeout in milliseconds (default: 60000 ms = 60s).
+        ctx: Optional FastMCP request context.
 
     Returns:
         Structured instruct result output.
     """
-    client, server_url, headers = get_client_context()
+    client, server_url, headers = get_client_context(ctx=ctx)
     response = await client.instruct.it_async(
         text=text,
         template=template,
@@ -42,6 +46,7 @@ async def extract_inference(
     threshold: Optional[float] = None,
     model_id: Optional[str] = None,
     timeout_ms: Optional[int] = 60000,
+    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """Executes entity/relation extraction on text.
 
@@ -51,11 +56,12 @@ async def extract_inference(
         threshold: Optional confidence threshold float (0.0 to 1.0).
         model_id: Optional model identifier override.
         timeout_ms: Optional request timeout in milliseconds (default: 60000 ms = 60s).
+        ctx: Optional FastMCP request context.
 
     Returns:
         Extraction results with detected entities and spans.
     """
-    client, server_url, headers = get_client_context()
+    client, server_url, headers = get_client_context(ctx=ctx)
     response = await client.extract.it_async(
         text=text,
         labels=labels,
@@ -74,6 +80,7 @@ async def comprehend_inference(
     threshold: Optional[float] = None,
     model_id: Optional[str] = None,
     timeout_ms: Optional[int] = 60000,
+    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """Executes text classification and zero-shot comprehension.
 
@@ -83,11 +90,12 @@ async def comprehend_inference(
         threshold: Optional confidence threshold (0.0 to 1.0).
         model_id: Optional model identifier override.
         timeout_ms: Optional request timeout in milliseconds (default: 60000 ms = 60s).
+        ctx: Optional FastMCP request context.
 
     Returns:
         Classification results with label confidence scores.
     """
-    client, server_url, headers = get_client_context()
+    client, server_url, headers = get_client_context(ctx=ctx)
     response = await client.comprehend.it_async(
         text=text,
         labels=labels,

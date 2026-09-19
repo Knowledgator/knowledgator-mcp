@@ -1,5 +1,7 @@
 from typing import Any, Dict, Optional
 
+from mcp.server.fastmcp import Context
+
 from knowledgator_mcp.utils import serialize
 from knowledgator_mcp.client import get_client_context
 
@@ -10,6 +12,7 @@ async def start_training_job(
     hyperparameters: Optional[Dict[str, Any]] = None,
     type: str = "model",
     validation_dataset_id: Optional[str] = None,
+    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """Starts a model fine-tuning training job.
 
@@ -19,11 +22,12 @@ async def start_training_job(
         hyperparameters: Optional dictionary of training hyperparameters (seed, batch, learning_rate_mult, num_of_epochs).
         type: Training job type ('model', 'adapter', 'qlora', 'dpo', 'sft'). Defaults to 'model'.
         validation_dataset_id: Optional validation dataset identifier.
+        ctx: Optional FastMCP request context.
 
     Returns:
         Training job details including training ID and status.
     """
-    client, server_url, headers = get_client_context()
+    client, server_url, headers = get_client_context(ctx=ctx)
     if client.finetuning is None:
         raise RuntimeError("Finetuning API is not enabled for the current client configuration.")
     response = client.finetuning.start_training(
@@ -38,16 +42,20 @@ async def start_training_job(
     return serialize(response)
 
 
-async def get_training_status(training_id: str) -> Dict[str, Any]:
+async def get_training_status(
+    training_id: str,
+    ctx: Optional[Context] = None,
+) -> Dict[str, Any]:
     """Gets details and status of a training job.
 
     Args:
         training_id: Unique training job identifier.
+        ctx: Optional FastMCP request context.
 
     Returns:
         Full details of the training job including status, metrics, and progress.
     """
-    client, server_url, headers = get_client_context()
+    client, server_url, headers = get_client_context(ctx=ctx)
     if client.finetuning is None:
         raise RuntimeError("Finetuning API is not enabled for the current client configuration.")
     response = client.finetuning.get_training(
@@ -64,6 +72,7 @@ async def list_trainings(
     model_id: Optional[str] = None,
     dataset_id: Optional[str] = None,
     status: Optional[str] = None,
+    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """Lists training jobs with optional status/model/dataset filtering.
 
@@ -73,11 +82,12 @@ async def list_trainings(
         model_id: Optional filter by base model ID.
         dataset_id: Optional filter by dataset ID.
         status: Optional status filter ('pending', 'running', 'successful', 'failed', 'stopped').
+        ctx: Optional FastMCP request context.
 
     Returns:
         List of training jobs with total count and pagination metadata.
     """
-    client, server_url, headers = get_client_context()
+    client, server_url, headers = get_client_context(ctx=ctx)
     if client.finetuning is None:
         raise RuntimeError("Finetuning API is not enabled for the current client configuration.")
     response = client.finetuning.list_trainings(
@@ -92,16 +102,20 @@ async def list_trainings(
     return serialize(response)
 
 
-async def stop_training_job(training_id: str) -> Dict[str, Any]:
+async def stop_training_job(
+    training_id: str,
+    ctx: Optional[Context] = None,
+) -> Dict[str, Any]:
     """Stops a currently running fine-tuning training job.
 
     Args:
         training_id: Unique training job identifier to stop.
+        ctx: Optional FastMCP request context.
 
     Returns:
         Confirmation response with updated status.
     """
-    client, server_url, headers = get_client_context()
+    client, server_url, headers = get_client_context(ctx=ctx)
     if client.finetuning is None:
         raise RuntimeError("Finetuning API is not enabled for the current client configuration.")
     response = client.finetuning.stop_training(
