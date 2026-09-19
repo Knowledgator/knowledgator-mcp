@@ -4,8 +4,8 @@
 
 help:
 	@echo "Available commands:"
-	@echo "  make build               Build production Docker image (v$(VERSION)) with SSH forwarding"
-	@echo "  make push                Push Docker image (tags: latest and v$(VERSION)) to remote registry"
+	@echo "  make build               Build production Docker image (version: $(if $(VERSION),$(VERSION),latest)) with SSH forwarding"
+	@echo "  make push                Push Docker image (tags: latest $(if $(VERSION),and $(VERSION),)) to remote registry"
 	@echo "  make check-ssh           Verify SSH agent status"
 	@echo "  make dev-install         Install local development environment via Poetry"
 	@echo "  make dev-sse             Run local MCP server in SSE mode via Poetry (port 8000)"
@@ -30,12 +30,18 @@ check-ssh:
 		echo "         ssh-add ~/.ssh/<your-key-file>"; \
 	fi
 
-# Build production container image using Dockerfile (tagged as :latest and :$(VERSION))
+# Build production container image using Dockerfile
 build: check-ssh
-	@echo "🔨 Building knowledgator-mcp version $(VERSION)..."
-	podman build --ssh default=$$SSH_AUTH_SOCK -t knowledgator-mcp:latest -t knowledgator-mcp:$(VERSION) .
+	@echo "🔨 Building knowledgator-mcp..."
+	@if [ -n "$(VERSION)" ]; then \
+		echo "🏷️ Applying tags: latest and $(VERSION)"; \
+		podman build --ssh default=$$SSH_AUTH_SOCK -t knowledgator-mcp:latest -t knowledgator-mcp:$(VERSION) .; \
+	else \
+		echo "🏷️ Applying tag: latest"; \
+		podman build --ssh default=$$SSH_AUTH_SOCK -t knowledgator-mcp:latest .; \
+	fi
 
-# Tag and push built container image to remote registry (pushes both :latest and :$(VERSION))
+# Tag and push built container image to remote registry
 push:
 	@IMAGE_REF="$${IMAGE_REF:-$$CI_REGISTRY_IMAGE}"; \
 	REGISTRY_USER="$${REGISTRY_USER:-$$CI_REGISTRY_USER}"; \
@@ -53,15 +59,19 @@ push:
 	fi; \
 	echo "🏷️ Tagging images for registry:"; \
 	echo "   - $${BASE_REF}:latest"; \
-	echo "   - $${BASE_REF}:$(VERSION)"; \
 	podman tag knowledgator-mcp:latest $${BASE_REF}:latest && \
-	podman tag knowledgator-mcp:$(VERSION) $${BASE_REF}:$(VERSION) && \
+	if [ -n "$(VERSION)" ]; then \
+		echo "   - $${BASE_REF}:$(VERSION)"; \
+		podman tag knowledgator-mcp:latest $${BASE_REF}:$(VERSION); \
+	fi && \
 	echo "🔐 Logging in to $${REGISTRY_DOMAIN}..." && \
 	echo "$$REGISTRY_PASSWORD" | podman login -u $$REGISTRY_USER --password-stdin $${REGISTRY_DOMAIN} && \
 	echo "🚀 Pushing image tags..." && \
 	podman push $${BASE_REF}:latest && \
-	podman push $${BASE_REF}:$(VERSION) && \
-	echo "✅ Pushed $${BASE_REF}:latest and $${BASE_REF}:$(VERSION) successfully!"
+	if [ -n "$(VERSION)" ]; then \
+		podman push $${BASE_REF}:$(VERSION); \
+	fi && \
+	echo "✅ Pushed image successfully!"
 
 # Install dev environment with Poetry
 dev-install:
