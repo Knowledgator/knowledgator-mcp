@@ -451,7 +451,7 @@ optional = false
 python-versions = ">=3.9,<4.0"
 groups = ["main"]
 files = []
-develop = false
+develop = true
 
 [package.dependencies]
 httpx = ">=0.28.1"

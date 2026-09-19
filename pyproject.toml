@@ -15,7 +15,7 @@ classifiers = [
   "License :: OSI Approved :: Apache Software License",
   "Topic :: Internet :: WWW/HTTP :: HTTP Client",
 ]
-packages = [{include = "knowledgator-mcp"}]
+packages = [{include = "knowledgator_mcp"}]
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/knowledgator/knowledgator-mcp/issues"
@@ -42,7 +42,7 @@ mypy = "==1.15.0"
 pylint = "==3.2.3"
 
 [tool.poetry.scripts]
-knowledgator-mcp = "knowledgator-mcp.app:main"
+knowledgator-mcp = "knowledgator_mcp.app:main"
 
 [tool.ruff]
 line-length = 120
