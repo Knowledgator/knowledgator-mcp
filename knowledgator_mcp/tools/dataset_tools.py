@@ -8,16 +8,12 @@ from knowledgator_mcp.client import get_client_context
 
 async def generate_dataset_plan(
     prompt: str,
-    dataset_type: str = "text-classification",
-    target_format: str = "jsonl",
     ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """Generates a dataset creation plan based on a task prompt.
 
     Args:
         prompt: Detailed prompt describing the goal, target domain, and schema for the dataset.
-        dataset_type: Type of task (e.g., 'text-classification', 'ner', 'relation-extraction').
-        target_format: Desired dataset format ('jsonl', 'csv', 'parquet', 'json').
         ctx: Optional FastMCP request context.
 
     Returns:
@@ -40,7 +36,6 @@ async def start_dataset_generation(
     dataset_type: str,
     prompt: Optional[str] = None,
     description: Optional[str] = None,
-    format: str = "jsonl",
     num_samples: int = 100,
     domains: Optional[List[str]] = None,
     classes: Optional[List[str]] = None,
@@ -56,7 +51,6 @@ async def start_dataset_generation(
         dataset_type: Service type ('ner', 'text-classification', 'classification', 'relation-extraction', 'instruct-it').
         prompt: Task prompt describing the data to generate. If omitted, uses description or name.
         description: Optional description of the dataset purpose and prompt specifications.
-        format: Dataset format ('jsonl', 'csv', 'parquet', 'json').
         num_samples: Number of samples to generate (default: 100).
         domains: Optional list of domain tags (e.g. ['e-commerce', 'finance']).
         classes: Optional list of classification target categories (for classification / text-classification).
