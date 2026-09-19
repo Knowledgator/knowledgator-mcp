@@ -4,8 +4,8 @@
 
 help:
 	@echo "Available commands:"
-	@echo "  make build               Build production Docker image with SSH forwarding (Podman/Docker)"
-	@echo "  make push                Push built Docker image to remote registry (GHCR/GitLab)"
+	@echo "  make build               Build production Docker image (v$(VERSION)) with SSH forwarding"
+	@echo "  make push                Push Docker image (tags: latest and v$(VERSION)) to remote registry"
 	@echo "  make check-ssh           Verify SSH agent status"
 	@echo "  make dev-install         Install local development environment via Poetry"
 	@echo "  make dev-sse             Run local MCP server in SSE mode via Poetry (port 8000)"
@@ -30,24 +30,38 @@ check-ssh:
 		echo "         ssh-add ~/.ssh/<your-key-file>"; \
 	fi
 
-# Build production container image using Dockerfile (single canonical source of truth)
+# Build production container image using Dockerfile (tagged as :latest and :$(VERSION))
 build: check-ssh
-	podman build --ssh default=$$SSH_AUTH_SOCK -t knowledgator-mcp:latest .
+	@echo "🔨 Building knowledgator-mcp version $(VERSION)..."
+	podman build --ssh default=$$SSH_AUTH_SOCK -t knowledgator-mcp:latest -t knowledgator-mcp:$(VERSION) .
 
-# Tag and push built container image to remote registry (GHCR / GitLab Registry)
+# Tag and push built container image to remote registry (pushes both :latest and :$(VERSION))
 push:
-	@if [ -z "$$IMAGE_REF" ]; then \
-		read -p "Enter Target Image Ref (e.g. ghcr.io/Knowledgator/knowledgator-mcp:latest): " IMAGE_REF; \
+	@IMAGE_REF="$${IMAGE_REF:-$$CI_REGISTRY_IMAGE}"; \
+	REGISTRY_USER="$${REGISTRY_USER:-$$CI_REGISTRY_USER}"; \
+	REGISTRY_PASSWORD="$${REGISTRY_PASSWORD:-$$CI_REGISTRY_PASSWORD}"; \
+	if [ -z "$$IMAGE_REF" ]; then \
+		read -p "Enter Registry Image Base (e.g. ghcr.io/username/knowledgator-mcp or registry.gitlab.com/org/knowledgator-mcp): " IMAGE_REF; \
 	fi; \
+	BASE_REF=$$(echo "$$IMAGE_REF" | sed 's/:.*//'); \
+	REGISTRY_DOMAIN=$$(echo "$$BASE_REF" | cut -d/ -f1); \
 	if [ -z "$$REGISTRY_USER" ]; then \
 		read -p "Enter Registry Username: " REGISTRY_USER; \
 	fi; \
 	if [ -z "$$REGISTRY_PASSWORD" ]; then \
 		read -sp "Enter Registry PAT Token: " REGISTRY_PASSWORD; echo ""; \
 	fi; \
-	podman tag knowledgator-mcp:latest $$IMAGE_REF && \
-	echo "$$REGISTRY_PASSWORD" | podman login -u $$REGISTRY_USER --password-stdin $$(echo $$IMAGE_REF | cut -d/ -f1) && \
-	podman push $$IMAGE_REF
+	echo "🏷️ Tagging images for registry:"; \
+	echo "   - $${BASE_REF}:latest"; \
+	echo "   - $${BASE_REF}:$(VERSION)"; \
+	podman tag knowledgator-mcp:latest $${BASE_REF}:latest && \
+	podman tag knowledgator-mcp:$(VERSION) $${BASE_REF}:$(VERSION) && \
+	echo "🔐 Logging in to $${REGISTRY_DOMAIN}..." && \
+	echo "$$REGISTRY_PASSWORD" | podman login -u $$REGISTRY_USER --password-stdin $${REGISTRY_DOMAIN} && \
+	echo "🚀 Pushing image tags..." && \
+	podman push $${BASE_REF}:latest && \
+	podman push $${BASE_REF}:$(VERSION) && \
+	echo "✅ Pushed $${BASE_REF}:latest and $${BASE_REF}:$(VERSION) successfully!"
 
 # Install dev environment with Poetry
 dev-install:
