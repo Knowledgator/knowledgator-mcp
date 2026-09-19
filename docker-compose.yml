@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  knowledgator-mcp:
+    build:
+      context: ..
+      dockerfile: knowledgator-mcp/Dockerfile
+    image: knowledgator-mcp:latest
+    container_name: knowledgator-mcp-server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - KNOWLEDGEGATOR_API_KEY=${KNOWLEDGEGATOR_API_KEY:-}
+      - KNOWLEDGEGATOR_BASE_URL=${KNOWLEDGEGATOR_BASE_URL:-https://api.knowledgator.com/v1}
+      - KNOWLEDGEGATOR_AUTH_TYPE=${KNOWLEDGEGATOR_AUTH_TYPE:-bearer}
+      - MCP_SERVER_NAME=${MCP_SERVER_NAME:-knowledgator-mcp}
+      - MCP_DEBUG=${MCP_DEBUG:-false}
+    command: ["--transport", "sse", "--host", "0.0.0.0", "--port", "8000"]
