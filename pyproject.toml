@@ -26,7 +26,11 @@ mcp = ">=1.3.0,<2.0.0"
 pydantic = "^2.7.0"
 pydantic-settings = "^2.2.0"
 uvicorn = "^0.30.0"
-knowledgator = {git = "git@github.com:Knowledgator/knowledgator-sdk.py.git"}
+knowledgator = {git = "git@github.com:Knowledgator/knowledgator-sdk.py.git", branch = "fixes"}
+
+[tool.poetry.group.ci.dependencies]
+dagger-io = "^0.13.0"
+
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.2"
