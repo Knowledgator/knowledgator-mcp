@@ -1,11 +1,9 @@
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Tuple, Optional
 
 from knowledgator import Knowledgator
-from knowledgator.exceptions import ClientError
-
 from knowledgator_mcp.auth import BaseAuthProvider, get_auth_provider
+from knowledgator.exceptions import ClientError
 from knowledgator_mcp.config import ServerConfig, settings
-
 from knowledgator_mcp.auth.providers import extract_key_from_ctx
 
 _client: Optional[Knowledgator] = None

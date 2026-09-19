@@ -1,8 +1,10 @@
 import os
 from typing import Any, Optional
-from knowledgator_mcp.auth.base import BaseAuthProvider
-from knowledgator_mcp.auth.providers import APIKeyAuthProvider, APIProxyAuthProvider
+
 from knowledgator_mcp.config import ServerConfig
+from knowledgator_mcp.auth.base import BaseAuthProvider
+
+from knowledgator_mcp.auth.providers import APIKeyAuthProvider, APIProxyAuthProvider
 
 
 def get_auth_provider(server_config: ServerConfig, ctx: Any = None) -> BaseAuthProvider:
