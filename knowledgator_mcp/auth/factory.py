@@ -14,7 +14,6 @@ def get_auth_provider(server_config: ServerConfig, ctx: Any = None) -> BaseAuthP
     if auth_type == "api_proxy":
         return APIProxyAuthProvider(
             ctx=ctx,
-            explicit_key=server_config.api_key,
             base_url=server_config.base_url,
         )
     elif auth_type == "api_key":
