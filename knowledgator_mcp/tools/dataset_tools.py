@@ -1,9 +1,10 @@
+from pathlib import Path
 from typing import Any, Dict, List, Optional
-
 from mcp.server.fastmcp import Context
 
-from knowledgator_mcp.utils import serialize
 from knowledgator_mcp.client import get_client_context
+from knowledgator_mcp.utils import serialize
+
 
 
 async def generate_dataset_plan(
@@ -142,3 +143,321 @@ async def get_dataset_details(
         http_headers=headers,
     )
     return serialize(response)
+
+
+def _sanitize_filename(name: str) -> str:
+    """Sanitize arbitrary string into a filesystem-safe filename."""
+    import re
+
+    # Replace forbidden path characters, slashes, and control characters with underscore
+    clean = re.sub(r'[\\/*?:"<>|\r\n\t\s]+', "_", name).strip("._ ")
+    return clean or "dataset"
+
+
+def _resolve_dest_path(
+    dataset_name: str,
+    output_path: Optional[str] = None,
+    output_dir: Optional[str] = "data",
+) -> Path:
+    """Safely resolve and sanitize target output file path (enforces .json)."""
+    safe_default_name = _sanitize_filename(dataset_name)
+    if not safe_default_name.lower().endswith(".json"):
+        safe_default_name += ".json"
+
+    if output_path:
+        p = Path(output_path).expanduser()
+        # If output_path points to an existing directory or ends with a slash:
+        if p.is_dir() or output_path.endswith(("/", "\\")):
+            dest_file = p / safe_default_name
+        else:
+            # Sanitize user/gemini provided filename while preserving directory structure
+            safe_user_filename = _sanitize_filename(p.name)
+            if not safe_user_filename.lower().endswith(".json"):
+                safe_user_filename += ".json"
+            dest_file = p.parent / safe_user_filename
+    else:
+        dest_dir = Path(output_dir or "data").expanduser()
+        dest_file = dest_dir / safe_default_name
+
+    dest_file.parent.mkdir(parents=True, exist_ok=True)
+    return dest_file.resolve()
+
+
+def _validate_classification_dataset(data: Any) -> List[Dict[str, Any]]:
+    """Validate that dataset data is a non-empty list of dicts with classification fields.
+
+    Prevents uploading malformed or garbage data to the platform.
+    """
+    if not isinstance(data, list):
+        raise ValueError(f"Dataset payload must be a JSON list of items, got {type(data).__name__}.")
+    if len(data) == 0:
+        raise ValueError("Dataset payload is empty (0 samples). Cannot upload an empty dataset.")
+
+    text_keys = {"text", "input", "content", "sentence", "premise"}
+    label_keys = {"label", "category", "target", "classes", "class", "true_labels", "all_labels"}
+
+    for idx, item in enumerate(data):
+        if not isinstance(item, dict):
+            raise ValueError(f"Sample at index {idx} must be a dictionary, got {type(item).__name__}.")
+        has_text = any(k in item and isinstance(item[k], str) and item[k].strip() for k in text_keys)
+        if not has_text:
+            raise ValueError(
+                f"Sample at index {idx} is missing a valid text field (expected one of: {', '.join(sorted(text_keys))})."
+            )
+        has_label = any(k in item for k in label_keys)
+        if not has_label:
+            raise ValueError(
+                f"Sample at index {idx} is missing a classification target/label (expected one of: {', '.join(sorted(label_keys))})."
+            )
+
+    return data
+
+
+def _validate_dataset_payload(data: Any, dataset_type: str = "comprehend-it") -> List[Dict[str, Any]]:
+    """Validate that dataset data is a non-empty list of dicts appropriate for its type."""
+    if not isinstance(data, list):
+        if isinstance(data, dict) and "data" in data and isinstance(data["data"], list):
+            data = data["data"]
+        else:
+            raise ValueError(f"Dataset payload must be a JSON list of items, got {type(data).__name__}.")
+    if len(data) == 0:
+        raise ValueError("Dataset payload is empty (0 samples). Cannot upload an empty dataset.")
+
+    for idx, item in enumerate(data):
+        if not isinstance(item, dict):
+            raise ValueError(f"Sample at index {idx} must be a dictionary, got {type(item).__name__}.")
+
+    if dataset_type == "comprehend-it":
+        return _validate_classification_dataset(data)
+
+    return data
+
+
+def _sanitize_dataset_name(name: str, fallback: Optional[str] = None) -> str:
+    """Sanitizes dataset name to satisfy OpenAPI pattern ^[a-zA-Z0-9- .()]+$ and length 2-64 without auto-adding version suffixes."""
+    import re
+
+    clean_name = name.strip() if name else ""
+    if not clean_name and fallback:
+        clean_name = fallback.strip()
+    if not clean_name:
+        clean_name = "Dataset"
+
+    # Enforce OpenAPI pattern ^[a-zA-Z0-9- .()]+$
+    clean_name = re.sub(r'[^a-zA-Z0-9\- .()]', '-', clean_name).strip()
+    if len(clean_name) < 2:
+        clean_name = f"{clean_name}-ds"[:64]
+    elif len(clean_name) > 64:
+        clean_name = clean_name[:64]
+
+    return clean_name
+
+
+async def download_dataset(
+    dataset_id: str,
+    timeout_ms: Optional[int] = None,
+    ctx: Optional[Context] = None,
+) -> Any:
+    """Downloads an existing dataset by ID statelessly in memory.
+
+    Streams chunks from the platform and returns the dataset samples/rows directly.
+    To retrieve dataset metadata (name, format, status, sample count), use get_dataset_details().
+
+    Args:
+        dataset_id: Unique identifier of the dataset (e.g. 'd655eda9-ca67-4a86-a8bc-5b3911233c79').
+        timeout_ms: Optional timeout override in milliseconds (defaults to server config settings).
+        ctx: Optional FastMCP request context.
+
+    Returns:
+        The raw dataset rows (typically List[Dict[str, Any]]).
+    """
+    import json
+    import logging
+    import httpx
+    from knowledgator_mcp.config import settings
+
+    logger = logging.getLogger("knowledgator_mcp.tools.dataset_tools")
+    logger.info("Initiating stateless download for dataset: %s", dataset_id)
+
+    client, server_url, headers = get_client_context(ctx=ctx)
+
+    # Resolve timeout: reuse settings.request_timeout_ms (env var KG_MCP_REQUEST_TIMEOUT_MS)
+    effective_timeout_ms = timeout_ms or settings.request_timeout_ms
+    timeout_sec = max(5.0, float(effective_timeout_ms) / 1000.0)
+
+    # Call download endpoint with follow_redirects=True for HTTP 307
+    download_url = f"{server_url.rstrip('/')}/datasets/{dataset_id}/download/"
+
+    async with httpx.AsyncClient(follow_redirects=True, timeout=timeout_sec) as http_client:
+        resp = await http_client.get(download_url, headers=headers)
+
+        if resp.status_code >= 400:
+            error_detail = resp.text
+            try:
+                err_json = resp.json()
+                error_detail = err_json.get("message") or err_json.get("detail") or resp.text
+            except Exception:
+                pass
+            logger.error("Download failed for dataset %s (HTTP %d): %s", dataset_id, resp.status_code, error_detail)
+            raise RuntimeError(
+                f"Failed to download dataset {dataset_id} (HTTP {resp.status_code}): {error_detail}"
+            )
+
+        content = resp.content
+
+        # Handle case where API returns a JSON storage redirect URL instead of direct 307
+        parsed_json = None
+        content_type = resp.headers.get("content-type", "").lower()
+        if "json" in content_type:
+            try:
+                parsed_json = resp.json()
+            except Exception:
+                pass
+
+        target_storage_url = None
+        if isinstance(parsed_json, str) and parsed_json.startswith(("http://", "https://")):
+            target_storage_url = parsed_json
+        elif isinstance(parsed_json, dict) and isinstance(parsed_json.get("url"), str):
+            target_storage_url = parsed_json["url"]
+
+        if target_storage_url:
+            logger.info("Following storage redirect URL: %s...", target_storage_url[:80])
+            storage_resp = await http_client.get(target_storage_url)
+            if storage_resp.status_code >= 400:
+                raise RuntimeError(
+                    f"Failed to fetch dataset from storage URL (HTTP {storage_resp.status_code}): {storage_resp.text}"
+                )
+            content = storage_resp.content
+
+        # Ensure downloaded content is not empty
+        if not content or len(content) == 0:
+            raise RuntimeError(f"Downloaded content for dataset '{dataset_id}' is empty (0 bytes).")
+
+        # Parse JSON data
+        try:
+            text_str = content.decode("utf-8")
+            data_obj = json.loads(text_str)
+        except Exception as exc:
+            logger.warning("Could not parse JSON for dataset '%s': %s", dataset_id, exc)
+            return content
+
+    # Return pure dataset rows directly
+    return data_obj
+
+
+async def upload_dataset(
+    name: str,
+    data: Optional[List[Dict[str, Any]]] = None,
+    json_content: Optional[str] = None,
+    dataset_type: str = "classification",
+    short_description: Optional[str] = None,
+    ctx: Optional[Context] = None,
+) -> Dict[str, Any]:
+    """Uploads a validated dataset to create a new dataset.
+
+    Accepts dataset records in memory (data) or as a JSON string (json_content).
+    Validates that the data is not empty, sanitizes the dataset name to meet API pattern
+    requirements without modifying user versioning, and uploads in-memory without
+    requiring local disk storage on the MCP server.
+
+    Args:
+        name: Name for the dataset (e.g. 'Customer Feedback Sentiment').
+        data: In-memory list of sample dictionaries.
+        json_content: Raw JSON string of the dataset samples.
+        dataset_type: Service type ('classification', 'ner', etc.).
+        short_description: Optional short description (max 1024 characters).
+        ctx: Optional FastMCP request context.
+
+    Returns:
+        Creation response with new dataset ID, name, sample count, and status.
+    """
+    import json
+    import logging
+
+    logger = logging.getLogger("knowledgator_mcp.tools.dataset_tools")
+
+    # Resolve raw dataset data
+    resolved_data: Optional[List[Dict[str, Any]]] = None
+    if data is not None:
+        resolved_data = data
+    elif json_content is not None:
+        try:
+            resolved_data = json.loads(json_content)
+        except Exception as exc:
+            raise ValueError(f"Invalid JSON provided in json_content: {exc}")
+    else:
+        raise ValueError("Either 'data' or 'json_content' must be provided.")
+
+    # Normalize dataset type and validate schema
+    type_map = {
+        "classification": "comprehend-it",
+        "text-classification": "comprehend-it",
+        "comprehend-it": "comprehend-it",
+        "ner": "extract-it",
+        "named-entity-recognition": "extract-it",
+        "extract-it": "extract-it",
+        "relation-extraction": "extract-it",
+        "text2json": "instruct-it",
+        "instruct-it": "instruct-it",
+    }
+    normalized_type = type_map.get(dataset_type.lower().strip(), dataset_type)
+
+    logger.info("Validating dataset payload with %s samples", len(resolved_data) if isinstance(resolved_data, list) else 0)
+    validated_samples = _validate_dataset_payload(resolved_data, dataset_type=normalized_type)
+
+    # Clean dataset name without auto-versioning
+    clean_name = _sanitize_dataset_name(name)
+    logger.info("Prepared clean dataset name: '%s'", clean_name)
+
+    # Serialize to in-memory UTF-8 bytes (Stateless - no disk write on MCP)
+    json_bytes = json.dumps(validated_samples, ensure_ascii=False, indent=2).encode("utf-8")
+
+    # Call Knowledgator SDK client to create dataset + upload file
+    client, server_url, headers = get_client_context(ctx=ctx)
+    if client.datasets is None:
+        raise RuntimeError("Datasets API is not enabled for the current client configuration.")
+
+    create_kwargs: Dict[str, Any] = {
+        "name": clean_name,
+        "type": normalized_type,
+        "format": "json",
+        "file": json_bytes,
+        "server_url": server_url,
+        "http_headers": headers,
+    }
+    import inspect
+    try:
+        from knowledgator.apis.datasets import DatasetsAPI
+        create_sig = inspect.signature(DatasetsAPI.create)
+        has_short_desc = "short_description" in create_sig.parameters
+    except Exception:
+        has_short_desc = True
+
+    if has_short_desc:
+        create_kwargs["short_description"] = short_description
+    else:
+        create_kwargs["description"] = short_description
+
+    try:
+        creation_resp = await client.datasets.create_async(**create_kwargs)
+    except (AttributeError, TypeError):
+        creation_resp = client.datasets.create(**create_kwargs)
+
+    serialized = serialize(creation_resp)
+    new_id = serialized.get("id") if isinstance(serialized, dict) else str(creation_resp)
+    dataset_status = serialized.get("status", "valid") if isinstance(serialized, dict) else "valid"
+
+    logger.info("Successfully created dataset: %s", new_id)
+
+    return {
+        "status": "success",
+        "dataset_id": new_id,
+        "dataset_name": clean_name,
+        "sample_count": len(validated_samples),
+        "dataset_type": normalized_type,
+        "format": "json",
+        "size_bytes": len(json_bytes),
+        "dataset_status": dataset_status,
+        "short_description": short_description,
+    }
+
