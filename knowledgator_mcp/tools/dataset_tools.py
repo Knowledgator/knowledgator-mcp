@@ -306,19 +306,17 @@ async def download_dataset(
         content = resp.content
 
         # Handle case where API returns a JSON storage redirect URL instead of direct 307
-        parsed_json = None
+        target_storage_url = None
         content_type = resp.headers.get("content-type", "").lower()
         if "json" in content_type:
             try:
-                parsed_json = resp.json()
-            except Exception:
-                pass
-
-        target_storage_url = None
-        if isinstance(parsed_json, str) and parsed_json.startswith(("http://", "https://")):
-            target_storage_url = parsed_json
-        elif isinstance(parsed_json, dict) and isinstance(parsed_json.get("url"), str):
-            target_storage_url = parsed_json["url"]
+                raw_json = resp.json()
+                if isinstance(raw_json, dict) and isinstance(raw_json.get("url"), str):
+                    target_storage_url = raw_json["url"]
+                elif isinstance(raw_json, str) and raw_json.startswith(("http://", "https://")):
+                    target_storage_url = raw_json
+            except (json.JSONDecodeError, ValueError) as exc:
+                logger.debug("Response content-type was JSON but failed to decode redirect for %s: %s", dataset_id, exc)
 
         if target_storage_url:
             logger.info("Following storage redirect URL: %s...", target_storage_url[:80])
@@ -333,16 +331,20 @@ async def download_dataset(
         if not content or len(content) == 0:
             raise RuntimeError(f"Downloaded content for dataset '{dataset_id}' is empty (0 bytes).")
 
-        # Parse JSON data
+        # Parse downloaded content as JSON
         try:
             text_str = content.decode("utf-8")
-            data_obj = json.loads(text_str)
-        except Exception as exc:
-            logger.warning("Could not parse JSON for dataset '%s': %s", dataset_id, exc)
-            return content
+        except UnicodeDecodeError as exc:
+            raise RuntimeError(
+                f"Downloaded content for dataset '{dataset_id}' is not valid UTF-8: {exc}"
+            ) from exc
 
-    # Return pure dataset rows directly
-    return data_obj
+        try:
+            return json.loads(text_str)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(
+                f"Downloaded content for dataset '{dataset_id}' is not valid JSON: {exc}"
+            ) from exc
 
 
 async def upload_dataset(
@@ -421,26 +423,15 @@ async def upload_dataset(
         "name": clean_name,
         "type": normalized_type,
         "format": "json",
+        "short_description": short_description,
         "file": json_bytes,
         "server_url": server_url,
         "http_headers": headers,
     }
-    import inspect
-    try:
-        from knowledgator.apis.datasets import DatasetsAPI
-        create_sig = inspect.signature(DatasetsAPI.create)
-        has_short_desc = "short_description" in create_sig.parameters
-    except Exception:
-        has_short_desc = True
-
-    if has_short_desc:
-        create_kwargs["short_description"] = short_description
-    else:
-        create_kwargs["description"] = short_description
 
     try:
         creation_resp = await client.datasets.create_async(**create_kwargs)
-    except (AttributeError, TypeError):
+    except AttributeError:
         creation_resp = client.datasets.create(**create_kwargs)
 
     serialized = serialize(creation_resp)
