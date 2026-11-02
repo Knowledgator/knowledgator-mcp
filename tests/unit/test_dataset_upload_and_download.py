@@ -159,23 +159,15 @@ async def test_download_dataset_stateless_in_memory():
         {"id": "ex_1", "text": "Sample 1", "label": "cat_a"},
         {"id": "ex_2", "text": "Sample 2", "label": "cat_b"},
     ]
-    mock_bytes = json.dumps(samples).encode("utf-8")
-
-    mock_resp = MagicMock()
-    mock_resp.status_code = 200
-    mock_resp.content = mock_bytes
-    mock_resp.headers = {"content-type": "application/json"}
 
     with patch("knowledgator_mcp.tools.dataset_tools.get_client_context") as mock_ctx:
         mock_client = MagicMock()
-        mock_client.datasets.get.return_value = {"name": "StatelessDS"}
+        mock_client.datasets.download_async = AsyncMock(return_value=samples)
         mock_ctx.return_value = (mock_client, "https://api.knowledgator.com", {"header": "val"})
 
-        with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = mock_resp
-
-            res = await download_dataset(dataset_id="stateless-uuid-123")
-            assert res == samples
+        res = await download_dataset(dataset_id="stateless-uuid-123")
+        assert res == samples
+        mock_client.datasets.download_async.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -193,30 +185,54 @@ async def test_get_dataset_details_metadata():
 
 
 @pytest.mark.asyncio
-async def test_download_dataset_presigned_s3_redirect(tmp_path):
-    samples = [{"text": "Presigned redirect text", "label": "presigned"}]
-    payload_bytes = json.dumps(samples).encode("utf-8")
+async def test_download_dataset_streaming_to_file(tmp_path):
+    dest_file = tmp_path / "streamed.json"
+    chunk_1 = b'[{"text": "Sample", '
+    chunk_2 = b'"label": "test"}]'
 
-    # First call to /datasets/{id}/download/ returns JSON with storage URL
-    resp_redirect = MagicMock()
-    resp_redirect.status_code = 200
-    resp_redirect.headers = {"content-type": "application/json"}
-    resp_redirect.json.return_value = {"url": "https://storage.knowledgator.com/presigned-token-abc"}
+    async def fake_stream(*args, **kwargs):
+        yield chunk_1
+        yield chunk_2
 
-    # Second call to storage URL returns actual dataset bytes
-    resp_storage = MagicMock()
-    resp_storage.status_code = 200
-    resp_storage.content = payload_bytes
-    resp_storage.headers = {"content-type": "application/octet-stream"}
+    with patch("knowledgator_mcp.tools.dataset_tools.get_client_context") as mock_ctx:
+        mock_client = MagicMock(spec=["datasets"])
+        mock_datasets = MagicMock(spec=["stream_download_async"])
+        mock_datasets.stream_download_async = fake_stream
+        mock_client.datasets = mock_datasets
+        mock_ctx.return_value = (mock_client, "https://api.knowledgator.com", {})
+
+        res = await download_dataset(
+            dataset_id="stream-uuid-123",
+        )
+
+        assert res == [{"text": "Sample", "label": "test"}]
+
+
+@pytest.mark.asyncio
+async def test_upload_dataset_stateless_pass_through():
+    samples = [{"text": "Stream text", "label": "label_a"}]
+    json_str = json.dumps(samples)
 
     with patch("knowledgator_mcp.tools.dataset_tools.get_client_context") as mock_ctx:
         mock_client = MagicMock()
+        mock_create = AsyncMock()
+        mock_create.return_value = {
+            "id": "streamed-upload-id-123",
+            "status": "ready",
+            "name": "Stateless Upload",
+        }
+        mock_client.datasets.create_async = mock_create
         mock_ctx.return_value = (mock_client, "https://api.knowledgator.com", {})
 
-        with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-            mock_get.side_effect = [resp_redirect, resp_storage]
+        res = await upload_dataset(
+            name="Stateless Upload",
+            json_content=json_str,
+            dataset_type="classification",
+        )
 
-            res = await download_dataset(dataset_id="redirect-ds-uuid")
-
-            assert res == samples
-            assert mock_get.call_count == 2
+        assert res["status"] == "success"
+        assert res["dataset_id"] == "streamed-upload-id-123"
+        assert res["sample_count"] == 1
+        call_kwargs = mock_create.call_args.kwargs
+        assert "file" in call_kwargs
+        assert json.loads(call_kwargs["file"].decode("utf-8")) == samples

@@ -50,21 +50,13 @@ def test_resolve_dest_path_enforces_json_only(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_download_dataset_empty_content_raises_error(tmp_path):
-    mock_resp = MagicMock()
-    mock_resp.status_code = 200
-    mock_resp.content = b""
-    mock_resp.headers = {"content-type": "application/json"}
-
+async def test_download_dataset_empty_content_raises_error():
     with patch("knowledgator_mcp.tools.dataset_tools.get_client_context") as mock_ctx:
         mock_client = MagicMock()
-        mock_client.datasets.get.return_value = {"name": "EmptyDataset"}
+        mock_client.datasets.download_async = AsyncMock(return_value=[])
         mock_ctx.return_value = (mock_client, "https://api.test.com", {"header": "val"})
 
-        with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = mock_resp
-
-            with pytest.raises(RuntimeError, match="empty \\(0 bytes\\)"):
-                await download_dataset(
-                    dataset_id="test-id",
-                )
+        with pytest.raises(RuntimeError, match="empty \\(0 bytes\\)"):
+            await download_dataset(
+                dataset_id="test-id",
+            )

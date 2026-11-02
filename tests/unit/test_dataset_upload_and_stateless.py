@@ -59,25 +59,16 @@ async def test_download_dataset_stateless_in_memory():
         {"id": "ex_1", "text": "Sample 1", "label": "cat_a"},
         {"id": "ex_2", "text": "Sample 2", "label": "cat_b"},
     ]
-    mock_bytes = json.dumps(mock_samples).encode("utf-8")
-
-    mock_resp = MagicMock()
-    mock_resp.status_code = 200
-    mock_resp.content = mock_bytes
-    mock_resp.headers = {"content-type": "application/json"}
 
     with patch("knowledgator_mcp.tools.dataset_tools.get_client_context") as mock_ctx:
         mock_client = MagicMock()
-        mock_client.datasets.get.return_value = {"name": "StatelessDS"}
+        mock_client.datasets.download_async = AsyncMock(return_value=mock_samples)
         mock_ctx.return_value = (mock_client, "https://api.test.com", {"header": "val"})
 
-        with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = mock_resp
-
-            # Call without output_path / output_dir -> returns pure samples directly
-            res = await download_dataset(dataset_id="stateless-uuid-123")
-
-            assert res == mock_samples
+        # Call without file_path -> returns pure samples directly in-memory
+        res = await download_dataset(dataset_id="stateless-uuid-123")
+        assert res == mock_samples
+        mock_client.datasets.download_async.assert_called_once()
 
 
 @pytest.mark.asyncio
