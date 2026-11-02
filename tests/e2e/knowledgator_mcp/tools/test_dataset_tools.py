@@ -30,8 +30,6 @@ async def test_generate_dataset_plan():
     """Verify generate_dataset_plan MCP tool against live API."""
     result = await dataset_tools.generate_dataset_plan(
         prompt="Create a sentiment analysis dataset for product reviews",
-        dataset_type="text-classification",
-        target_format="jsonl",
     )
     assert isinstance(result, (dict, list))
 
@@ -44,12 +42,12 @@ async def test_start_dataset_generation():
         dataset_type="text-classification",
         prompt="Product review sentiment classification",
         description="Dataset for product review sentiment classification",
-        format="jsonl",
         num_samples=1,
         classes=["positive", "negative"],
         domains=["e-commerce"],
     )
     assert isinstance(result, (dict, list))
     print(f"{result=}")
+
 
 
