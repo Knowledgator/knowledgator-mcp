@@ -260,12 +260,13 @@ async def download_dataset(
 ) -> Any:
     """Downloads an existing dataset by ID statelessly in memory.
 
-    Streams chunks from the platform and returns the dataset samples/rows directly.
-    To retrieve dataset metadata (name, format, status, sample count), use get_dataset_details().
+    Streams chunks from the platform and passes the dataset samples/rows directly across
+    the MCP wire to the caller (e.g. sandbox sync script) without writing any files to
+    the MCP container disk.
 
     Args:
         dataset_id: Unique identifier of the dataset (e.g. 'd655eda9-ca67-4a86-a8bc-5b3911233c79').
-        timeout_ms: Optional timeout override in milliseconds (defaults to server config settings).
+        timeout_ms: Optional timeout override in milliseconds.
         ctx: Optional FastMCP request context.
 
     Returns:
@@ -273,78 +274,67 @@ async def download_dataset(
     """
     import json
     import logging
-    import httpx
     from knowledgator_mcp.config import settings
 
     logger = logging.getLogger("knowledgator_mcp.tools.dataset_tools")
     logger.info("Initiating stateless download for dataset: %s", dataset_id)
 
     client, server_url, headers = get_client_context(ctx=ctx)
+    if client.datasets is None:
+        raise RuntimeError("Datasets API is not enabled for the current client configuration.")
 
     # Resolve timeout: reuse settings.request_timeout_ms (env var KG_MCP_REQUEST_TIMEOUT_MS)
     effective_timeout_ms = timeout_ms or settings.request_timeout_ms
-    timeout_sec = max(5.0, float(effective_timeout_ms) / 1000.0)
 
-    # Call download endpoint with follow_redirects=True for HTTP 307
-    download_url = f"{server_url.rstrip('/')}/datasets/{dataset_id}/download/"
-
-    async with httpx.AsyncClient(follow_redirects=True, timeout=timeout_sec) as http_client:
-        resp = await http_client.get(download_url, headers=headers)
-
-        if resp.status_code >= 400:
-            error_detail = resp.text
-            try:
-                err_json = resp.json()
-                error_detail = err_json.get("message") or err_json.get("detail") or resp.text
-            except Exception:
-                pass
-            logger.error("Download failed for dataset %s (HTTP %d): %s", dataset_id, resp.status_code, error_detail)
-            raise RuntimeError(
-                f"Failed to download dataset {dataset_id} (HTTP {resp.status_code}): {error_detail}"
+    try:
+        # Prefer download_async with return_data=True for direct in-memory deserialization
+        if hasattr(client.datasets, "download_async"):
+            res = await client.datasets.download_async(
+                dataset_id=dataset_id,
+                return_data=True,
+                server_url=server_url,
+                timeout_ms=effective_timeout_ms,
+                http_headers=headers,
             )
+            if not res or (isinstance(res, (list, dict, bytes)) and len(res) == 0):
+                raise RuntimeError(f"Downloaded content for dataset '{dataset_id}' is empty (0 bytes).")
+            return res
+        elif hasattr(client.datasets, "stream_download_async"):
+            chunks: List[bytes] = []
+            async for chunk in client.datasets.stream_download_async(
+                dataset_id=dataset_id,
+                server_url=server_url,
+                timeout_ms=effective_timeout_ms,
+                http_headers=headers,
+            ):
+                chunks.append(chunk)
+            raw_bytes = b"".join(chunks)
+        else:
+            res = client.datasets.download(
+                dataset_id=dataset_id,
+                return_data=True,
+                server_url=server_url,
+                timeout_ms=effective_timeout_ms,
+                http_headers=headers,
+            )
+            if not res or (isinstance(res, (list, dict, bytes)) and len(res) == 0):
+                raise RuntimeError(f"Downloaded content for dataset '{dataset_id}' is empty (0 bytes).")
+            return res
 
-        content = resp.content
-
-        # Handle case where API returns a JSON storage redirect URL instead of direct 307
-        target_storage_url = None
-        content_type = resp.headers.get("content-type", "").lower()
-        if "json" in content_type:
-            try:
-                raw_json = resp.json()
-                if isinstance(raw_json, dict) and isinstance(raw_json.get("url"), str):
-                    target_storage_url = raw_json["url"]
-                elif isinstance(raw_json, str) and raw_json.startswith(("http://", "https://")):
-                    target_storage_url = raw_json
-            except (json.JSONDecodeError, ValueError) as exc:
-                logger.debug("Response content-type was JSON but failed to decode redirect for %s: %s", dataset_id, exc)
-
-        if target_storage_url:
-            logger.info("Following storage redirect URL: %s...", target_storage_url[:80])
-            storage_resp = await http_client.get(target_storage_url)
-            if storage_resp.status_code >= 400:
-                raise RuntimeError(
-                    f"Failed to fetch dataset from storage URL (HTTP {storage_resp.status_code}): {storage_resp.text}"
-                )
-            content = storage_resp.content
-
-        # Ensure downloaded content is not empty
-        if not content or len(content) == 0:
+        if not raw_bytes or len(raw_bytes) == 0:
             raise RuntimeError(f"Downloaded content for dataset '{dataset_id}' is empty (0 bytes).")
 
         # Parse downloaded content as JSON
         try:
-            text_str = content.decode("utf-8")
-        except UnicodeDecodeError as exc:
-            raise RuntimeError(
-                f"Downloaded content for dataset '{dataset_id}' is not valid UTF-8: {exc}"
-            ) from exc
+            return json.loads(raw_bytes.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return raw_bytes.decode("utf-8", errors="replace")
 
-        try:
-            return json.loads(text_str)
-        except json.JSONDecodeError as exc:
-            raise RuntimeError(
-                f"Downloaded content for dataset '{dataset_id}' is not valid JSON: {exc}"
-            ) from exc
+    except Exception as exc:
+        logger.error("Download failed for dataset %s: %s", dataset_id, exc)
+        raise RuntimeError(
+            f"Failed to download dataset {dataset_id}: {exc}. Please retry or run the sync script again."
+        ) from exc
 
 
 async def upload_dataset(
@@ -364,8 +354,8 @@ async def upload_dataset(
 
     Args:
         name: Name for the dataset (e.g. 'Customer Feedback Sentiment').
-        data: In-memory list of sample dictionaries.
-        json_content: Raw JSON string of the dataset samples.
+        data: Optional in-memory list of sample dictionaries.
+        json_content: Optional raw JSON string of dataset samples.
         dataset_type: Service type ('classification', 'ner', etc.).
         short_description: Optional short description (max 1024 characters).
         ctx: Optional FastMCP request context.
@@ -406,13 +396,14 @@ async def upload_dataset(
 
     logger.info("Validating dataset payload with %s samples", len(resolved_data) if isinstance(resolved_data, list) else 0)
     validated_samples = _validate_dataset_payload(resolved_data, dataset_type=normalized_type)
+    sample_count = len(validated_samples)
 
-    # Clean dataset name without auto-versioning
     clean_name = _sanitize_dataset_name(name)
     logger.info("Prepared clean dataset name: '%s'", clean_name)
 
     # Serialize to in-memory UTF-8 bytes (Stateless - no disk write on MCP)
     json_bytes = json.dumps(validated_samples, ensure_ascii=False, indent=2).encode("utf-8")
+    size_bytes = len(json_bytes)
 
     # Call Knowledgator SDK client to create dataset + upload file
     client, server_url, headers = get_client_context(ctx=ctx)
@@ -430,24 +421,30 @@ async def upload_dataset(
     }
 
     try:
-        creation_resp = await client.datasets.create_async(**create_kwargs)
-    except AttributeError:
-        creation_resp = client.datasets.create(**create_kwargs)
+        if hasattr(client.datasets, "create_async"):
+            creation_resp = await client.datasets.create_async(**create_kwargs)
+        else:
+            creation_resp = client.datasets.create(**create_kwargs)
+    except Exception as exc:
+        logger.error("Upload failed for dataset '%s': %s", clean_name, exc)
+        raise RuntimeError(
+            f"Failed to upload dataset '{clean_name}': {exc}. Please retry or run the sync script again."
+        ) from exc
 
     serialized = serialize(creation_resp)
     new_id = serialized.get("id") if isinstance(serialized, dict) else str(creation_resp)
     dataset_status = serialized.get("status", "valid") if isinstance(serialized, dict) else "valid"
 
-    logger.info("Successfully created dataset: %s", new_id)
+    logger.info("Successfully created dataset via SDK: %s", new_id)
 
     return {
         "status": "success",
         "dataset_id": new_id,
         "dataset_name": clean_name,
-        "sample_count": len(validated_samples),
+        "sample_count": sample_count,
         "dataset_type": normalized_type,
         "format": "json",
-        "size_bytes": len(json_bytes),
+        "size_bytes": size_bytes,
         "dataset_status": dataset_status,
         "short_description": short_description,
     }
