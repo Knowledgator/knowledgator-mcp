@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from mcp.server.fastmcp import Context
 
 from knowledgator_mcp.client import get_client_context
@@ -339,8 +339,8 @@ async def download_dataset(
 
 async def upload_dataset(
     name: str,
-    data: Optional[List[Dict[str, Any]]] = None,
-    json_content: Optional[str] = None,
+    data: Optional[Union[List[Any], Dict[str, Any], str]] = None,
+    json_content: Optional[Union[str, List[Any], Dict[str, Any]]] = None,
     dataset_type: str = "classification",
     short_description: Optional[str] = None,
     ctx: Optional[Context] = None,
@@ -348,14 +348,13 @@ async def upload_dataset(
     """Uploads a validated dataset to create a new dataset.
 
     Accepts dataset records in memory (data) or as a JSON string (json_content).
-    Validates that the data is not empty, sanitizes the dataset name to meet API pattern
-    requirements without modifying user versioning, and uploads in-memory without
-    requiring local disk storage on the MCP server.
+    Validates the dataset payload, sanitizes the dataset name, and streams directly to
+    the backend via multipart form data without creating any files on the MCP container disk.
 
     Args:
         name: Name for the dataset (e.g. 'Customer Feedback Sentiment').
-        data: Optional in-memory list of sample dictionaries.
-        json_content: Optional raw JSON string of dataset samples.
+        data: Optional in-memory list or dict of sample data, or JSON string.
+        json_content: Optional raw JSON string or parsed JSON object of dataset samples.
         dataset_type: Service type ('classification', 'ner', etc.).
         short_description: Optional short description (max 1024 characters).
         ctx: Optional FastMCP request context.
@@ -368,17 +367,19 @@ async def upload_dataset(
 
     logger = logging.getLogger("knowledgator_mcp.tools.dataset_tools")
 
-    # Resolve raw dataset data
-    resolved_data: Optional[List[Dict[str, Any]]] = None
-    if data is not None:
-        resolved_data = data
-    elif json_content is not None:
-        try:
-            resolved_data = json.loads(json_content)
-        except Exception as exc:
-            raise ValueError(f"Invalid JSON provided in json_content: {exc}")
-    else:
+    # Resolve raw dataset data from either parameter
+    raw_input = data if data is not None else json_content
+    if raw_input is None:
         raise ValueError("Either 'data' or 'json_content' must be provided.")
+
+    resolved_data: Any = None
+    if isinstance(raw_input, str):
+        try:
+            resolved_data = json.loads(raw_input)
+        except Exception as exc:
+            raise ValueError(f"Invalid JSON provided in dataset payload: {exc}")
+    else:
+        resolved_data = raw_input
 
     # Normalize dataset type and validate schema
     type_map = {
@@ -439,6 +440,7 @@ async def upload_dataset(
 
     return {
         "status": "success",
+        "id": new_id,
         "dataset_id": new_id,
         "dataset_name": clean_name,
         "sample_count": sample_count,
