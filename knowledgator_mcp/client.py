@@ -1,9 +1,11 @@
-from typing import Any, Dict, Tuple, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from knowledgator import Knowledgator
-from knowledgator_mcp.auth import BaseAuthProvider, get_auth_provider
 from knowledgator.exceptions import ClientError
+
+from knowledgator_mcp.auth import BaseAuthProvider, get_auth_provider
 from knowledgator_mcp.config import ServerConfig, settings
+
 from knowledgator_mcp.auth.providers import extract_key_from_ctx
 
 _client: Optional[Knowledgator] = None
@@ -30,11 +32,14 @@ def get_kg_client(
                 "Authentication required. Please provide an API key in request headers (KnowledgatorAPI-Key).",
                 status_code=401,
             )
+        eff_headers = dict(headers)
+        if "KnowledgatorAPI-Key" not in eff_headers:
+            eff_headers["KnowledgatorAPI-Key"] = proxy_api_key
         # Create stateless SDK client instance for this request context
         return Knowledgator(
             api_key=proxy_api_key,
             server_url=base_url,
-            server_base_headers=headers,
+            server_base_headers=eff_headers,
             timeout_ms=cfg.request_timeout_ms,
         )
 

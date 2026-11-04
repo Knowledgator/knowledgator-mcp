@@ -1,10 +1,39 @@
+import contextvars
 from typing import Any, Dict, Optional
 
 from knowledgator_mcp.auth.base import BaseAuthProvider
 
+_current_request_key: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "_current_request_key", default=None
+)
+
+
+def set_current_request_key(key: Optional[str]) -> contextvars.Token:
+    """Store the extracted API key strictly for the active request lifecycle."""
+    clean_key = key.strip() if key and isinstance(key, str) else None
+    return _current_request_key.set(clean_key)
+
+
+def reset_current_request_key(token: contextvars.Token) -> None:
+    """Reset the request-scoped API key immediately when request ends."""
+    try:
+        _current_request_key.reset(token)
+    except Exception:
+        _current_request_key.set(None)
+
+
+def get_current_request_key() -> Optional[str]:
+    """Retrieve the API key associated strictly with the active request task."""
+    return _current_request_key.get()
+
 
 def extract_key_from_ctx(ctx: Any) -> Optional[str]:
-    """Extract API key from FastMCP context."""
+    """Extract API key from FastMCP context, native Starlette request."""
+    # Check HTTP request header captured by per-request ASGI middleware
+    captured_key = get_current_request_key()
+    if captured_key:
+        return captured_key
+
     if ctx is None:
         return None
 
@@ -26,18 +55,29 @@ def extract_key_from_ctx(ctx: Any) -> Optional[str]:
 
     # Handle FastMCP Context object
     req_ctx = getattr(ctx, "request_context", None)
-    headers = getattr(req_ctx, "headers", None) if req_ctx is not None else getattr(ctx, "headers", None)
+    candidate_headers = []
+    if req_ctx is not None:
+        raw_req = getattr(req_ctx, "request", None)
+        if raw_req is not None and hasattr(raw_req, "headers"):
+            candidate_headers.append(raw_req.headers)
+        if hasattr(req_ctx, "headers"):
+            candidate_headers.append(req_ctx.headers)
+    if hasattr(ctx, "headers"):
+        candidate_headers.append(ctx.headers)
+
     meta = getattr(req_ctx, "meta", None) if req_ctx is not None else getattr(ctx, "meta", None)
 
     key = None
-    if headers and hasattr(headers, "get"):
-        val = (
-            headers.get("KnowledgatorAPI-Key")
-            or headers.get("knowledgatorapi-key")
-            or headers.get("authorization")
-        )
-        if isinstance(val, str) and val.strip():
-            key = val
+    for headers in candidate_headers:
+        if headers and hasattr(headers, "get"):
+            val = (
+                headers.get("KnowledgatorAPI-Key")
+                or headers.get("knowledgatorapi-key")
+                or headers.get("authorization")
+            )
+            if isinstance(val, str) and val.strip():
+                key = val
+                break
 
     if not key and meta and hasattr(meta, "get"):
         val = meta.get("api_key")

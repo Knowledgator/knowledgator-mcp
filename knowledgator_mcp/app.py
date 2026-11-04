@@ -1,14 +1,20 @@
 import argparse
 import sys
+from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from knowledgator_mcp.client import close_kg_client
 from knowledgator_mcp.config import settings
 from knowledgator_mcp.tools import dataset_tools, finetuning_tools, inference_tools
+from mcp.server.transport_security import TransportSecuritySettings
+
+transport_security = TransportSecuritySettings(enable_dns_rebinding_protection=False)
+
 
 mcp = FastMCP(
     name=settings.server_name,
     debug=settings.debug,
+    transport_security=transport_security,
 )
 
 # Register Dataset Tools
@@ -72,7 +78,27 @@ def main() -> None:
         elif args.transport == "sse":
             mcp.settings.host = args.host
             mcp.settings.port = args.port
-            mcp.run(transport="sse")
+
+            # Managed Proxy (auth_type == 'api_proxy') -> wrap with per-request key capture
+            if settings.auth_type.lower() == "api_proxy":
+                import asyncio
+                import uvicorn
+                from knowledgator_mcp.auth.middleware import APIKeyCaptureMiddleware
+
+                starlette_app = mcp.sse_app()
+                wrapped_app = APIKeyCaptureMiddleware(starlette_app)
+
+                config = uvicorn.Config(
+                    wrapped_app,
+                    host=mcp.settings.host,
+                    port=mcp.settings.port,
+                    log_level=mcp.settings.log_level.lower(),
+                )
+                server = uvicorn.Server(config)
+                asyncio.run(server.serve())
+            else:
+                # Dedicated / Self-Hosted (auth_type == 'api_key') -> run native FastMCP directly
+                mcp.run(transport="sse")
         else:
             sys.exit(1)
     finally:

@@ -1,9 +1,8 @@
 from typing import Any, Dict, Optional
-
 from mcp.server.fastmcp import Context
 
-from knowledgator_mcp.utils import serialize
 from knowledgator_mcp.client import get_client_context
+from knowledgator_mcp.utils import serialize
 
 
 async def start_training_job(
