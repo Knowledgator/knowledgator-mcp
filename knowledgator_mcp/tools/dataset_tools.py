@@ -377,7 +377,7 @@ async def upload_dataset(
         try:
             resolved_data = json.loads(raw_input)
         except Exception as exc:
-            raise ValueError(f"Invalid JSON provided in dataset payload: {exc}")
+            raise ValueError(f"Invalid JSON provided in json_content: {exc}")
     else:
         resolved_data = raw_input
 
