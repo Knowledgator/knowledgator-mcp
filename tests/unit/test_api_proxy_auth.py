@@ -1,13 +1,12 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
-
 import pytest
 
 from knowledgator.exceptions import ClientError
-from knowledgator_mcp.client import get_kg_client, get_client_context
-from knowledgator_mcp.config import ServerConfig
-from knowledgator_mcp.auth.factory import get_auth_provider
 from knowledgator_mcp.auth.providers import APIProxyAuthProvider
+from knowledgator_mcp.auth.factory import get_auth_provider
+from knowledgator_mcp.client import get_client_context, get_kg_client
+from knowledgator_mcp.config import ServerConfig
 from knowledgator_mcp.tools.inference_tools import instruct_inference
 
 
@@ -44,6 +43,18 @@ def test_api_proxy_provider_authorization_bearer_fallback():
 def test_api_proxy_missing_key_raises_401():
     """Verify 401 ClientError is raised when api_proxy request lacks an API key."""
     config = ServerConfig(auth_type="api_proxy", base_url="https://mcp.example.com")
+    ctx = make_mock_context({})
+
+    with pytest.raises(ClientError) as exc_info:
+        get_kg_client(server_config=config, ctx=ctx)
+
+    assert exc_info.value.status_code == 401
+    assert "Authentication required" in str(exc_info.value)
+
+
+def test_api_proxy_never_falls_back_to_server_static_key():
+    """Verify api_proxy strictly rejects requests lacking credentials even if server has a static key configured."""
+    config = ServerConfig(auth_type="api_proxy", api_key="sk-server-secret-key", base_url="https://mcp.example.com")
     ctx = make_mock_context({})
 
     with pytest.raises(ClientError) as exc_info:
