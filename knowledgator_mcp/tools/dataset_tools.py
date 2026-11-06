@@ -343,6 +343,7 @@ async def upload_dataset(
     json_content: Optional[Union[str, List[Any], Dict[str, Any]]] = None,
     dataset_type: str = "classification",
     short_description: Optional[str] = None,
+    parent_dataset_id: Optional[str] = None,
     ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """Uploads a validated dataset to create a new dataset.
@@ -357,6 +358,7 @@ async def upload_dataset(
         json_content: Optional raw JSON string or parsed JSON object of dataset samples.
         dataset_type: Service type ('classification', 'ner', etc.).
         short_description: Optional short description (max 1024 characters).
+        parent_dataset_id: Optional parent dataset UUID for version tracking.
         ctx: Optional FastMCP request context.
 
     Returns:
@@ -420,6 +422,9 @@ async def upload_dataset(
         "server_url": server_url,
         "http_headers": headers,
     }
+
+    if parent_dataset_id and parent_dataset_id != "none":
+        create_kwargs["parent_dataset_id"] = parent_dataset_id
 
     try:
         if hasattr(client.datasets, "create_async"):
