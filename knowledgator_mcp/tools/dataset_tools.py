@@ -11,7 +11,11 @@ async def generate_dataset_plan(
     prompt: str,
     ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
-    """Generates a dataset creation plan based on a task prompt.
+    """Generates a dataset creation plan from scratch based on a task prompt.
+
+    NOTE: This tool is strictly for designing BRAND NEW datasets from scratch on the
+    Knowledgator platform. DO NOT use this tool to remediate, audit, rebalance, or patch
+    existing local datasets (use the local dataset-plan / dataset-patch CLI tools instead).
 
     Args:
         prompt: Detailed prompt describing the goal, target domain, and schema for the dataset.
