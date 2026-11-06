@@ -4,28 +4,29 @@ from mcp.server.fastmcp import Context
 
 from knowledgator_mcp.utils import serialize
 from knowledgator_mcp.client import get_client_context
+from knowledgator.apis.open_model import OpenModelAPI
 
 
 async def instruct_inference(
+    ctx: Context,
     text: str,
     template: Optional[str] = None,
     output_type: Optional[str] = None,
     model_id: Optional[str] = None,
     timeout_ms: Optional[int] = 60000,
-    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
-    """Executes instruction task using Knowledgator Instruct API.
+    """Instruction task. Use when model's inference='instruct-it' or for default Instruct-It service.
 
     Args:
-        text: Main prompt instruction or text query.
-        template: Optional JSON schema template string the output should follow.
-        output_type: Optional hint for desired output format (json, string, markdown, etc.).
-        model_id: Optional model identifier override.
-        timeout_ms: Optional request timeout in milliseconds (default: 60000 ms = 60s).
-        ctx: Optional FastMCP request context.
+        text: Prompt/instruction.
+        template: JSON schema template.
+        output_type: Output format hint.
+        model_id: Model ID, or None for default service.
+        timeout_ms: Timeout in ms (default 60000).
+        ctx: FastMCP request context.
 
     Returns:
-        Structured instruct result output.
+        Instruct result.
     """
     client, server_url, headers = get_client_context(ctx=ctx)
     response = await client.instruct.it_async(
@@ -41,25 +42,25 @@ async def instruct_inference(
 
 
 async def extract_inference(
+    ctx: Context,
     text: str,
     labels: List[str],
     threshold: Optional[float] = None,
     model_id: Optional[str] = None,
     timeout_ms: Optional[int] = 60000,
-    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
-    """Executes entity/relation extraction on text.
+    """Entity/relation extraction. Use when model's inference='extract-it' or for default Extract-It service.
 
     Args:
-        text: Target input text to extract entities or relations from.
-        labels: List of target entity/relation labels to extract.
-        threshold: Optional confidence threshold float (0.0 to 1.0).
-        model_id: Optional model identifier override.
-        timeout_ms: Optional request timeout in milliseconds (default: 60000 ms = 60s).
-        ctx: Optional FastMCP request context.
+        text: Input text.
+        labels: Target labels.
+        threshold: Confidence threshold (0.0-1.0).
+        model_id: Model ID, or None for default service.
+        timeout_ms: Timeout in ms (default 60000).
+        ctx: FastMCP request context.
 
     Returns:
-        Extraction results with detected entities and spans.
+        Extraction results.
     """
     client, server_url, headers = get_client_context(ctx=ctx)
     response = await client.extract.it_async(
@@ -75,25 +76,25 @@ async def extract_inference(
 
 
 async def comprehend_inference(
+    ctx: Context,
     text: str,
     labels: List[str],
     threshold: Optional[float] = None,
     model_id: Optional[str] = None,
     timeout_ms: Optional[int] = 60000,
-    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
-    """Executes text classification and zero-shot comprehension.
+    """Text classification. Use when model's inference='comprehend-it' or for default Comprehend-It service.
 
     Args:
-        text: Input text to categorize or comprehend.
-        labels: List of candidate classification labels.
-        threshold: Optional confidence threshold (0.0 to 1.0).
-        model_id: Optional model identifier override.
-        timeout_ms: Optional request timeout in milliseconds (default: 60000 ms = 60s).
-        ctx: Optional FastMCP request context.
+        text: Input text.
+        labels: Classification labels.
+        threshold: Confidence threshold (0.0-1.0).
+        model_id: Model ID, or None for default service.
+        timeout_ms: Timeout in ms (default 60000).
+        ctx: FastMCP request context.
 
     Returns:
-        Classification results with label confidence scores.
+        Classification results.
     """
     client, server_url, headers = get_client_context(ctx=ctx)
     response = await client.comprehend.it_async(
@@ -106,3 +107,30 @@ async def comprehend_inference(
         timeout_ms=timeout_ms,
     )
     return serialize(response)
+
+
+async def open_model_inference(
+    ctx: Context,
+    model_id: str,
+    body: Dict[str, Any],
+    timeout_ms: Optional[int] = 60000,
+) -> Dict[str, Any]:
+    """Run inference on a model. Use when get_model_details returns inference='open-models'.
+
+    IMPORTANT: Call get_inference_details first to get the exact payload schema.
+    Different models expect different fields (e.g., 'entities' for NER, 'labels' for classification).
+
+    Args:
+        model_id: Model ID.
+        body: Request body matching the model's payload_schema from get_inference_details.
+        timeout_ms: Timeout in ms (default 60000).
+        ctx: FastMCP request context.
+
+    Returns:
+        Inference results.
+    """
+    client, server_url, headers = get_client_context(ctx=ctx)
+    open_model = OpenModelAPI(configs=client.configs, model_id=model_id)
+    open_model.base_headers.update(headers)
+    response = await open_model.predict_async(body, timeout_ms=timeout_ms)
+    return {"result": response}
