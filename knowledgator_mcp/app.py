@@ -36,6 +36,7 @@ mcp.tool()(finetuning_tools.stop_training_job)
 mcp.tool()(inference_tools.instruct_inference)
 mcp.tool()(inference_tools.extract_inference)
 mcp.tool()(inference_tools.comprehend_inference)
+mcp.tool()(inference_tools.open_model_inference)
 
 
 @mcp.resource("config://app")

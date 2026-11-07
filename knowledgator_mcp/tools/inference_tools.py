@@ -10,7 +10,7 @@ async def instruct_inference(
     text: str,
     template: Optional[str] = None,
     output_type: Optional[str] = None,
-    model_id: Optional[str] = None,
+    adapter_id: Optional[str] = None,
     timeout_ms: Optional[int] = 60000,
     ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
@@ -20,9 +20,12 @@ async def instruct_inference(
         text: Main prompt instruction or text query.
         template: Optional JSON schema template string the output should follow.
         output_type: Optional hint for desired output format (json, string, markdown, etc.).
-        model_id: Optional model identifier override.
+        adapter_id: Optional LoRA adapter ID for fine-tuned adapters (attaches KnowledgatorAPI-Model-ID header).
         timeout_ms: Optional request timeout in milliseconds (default: 60000 ms = 60s).
         ctx: Optional FastMCP request context.
+
+    Note:
+        For standalone full models (open-models), use 'open_model_inference' tool instead.
 
     Returns:
         Structured instruct result output.
@@ -32,7 +35,7 @@ async def instruct_inference(
         text=text,
         template=template,
         output_type=output_type,
-        model_id=model_id,
+        adapter_id=adapter_id,
         server_url=server_url,
         http_headers=headers,
         timeout_ms=timeout_ms,
@@ -44,7 +47,7 @@ async def extract_inference(
     text: str,
     labels: List[str],
     threshold: Optional[float] = None,
-    model_id: Optional[str] = None,
+    adapter_id: Optional[str] = None,
     timeout_ms: Optional[int] = 60000,
     ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
@@ -54,9 +57,12 @@ async def extract_inference(
         text: Target input text to extract entities or relations from.
         labels: List of target entity/relation labels to extract.
         threshold: Optional confidence threshold float (0.0 to 1.0).
-        model_id: Optional model identifier override.
+        adapter_id: Optional LoRA adapter ID for fine-tuned adapters (attaches KnowledgatorAPI-Model-ID header).
         timeout_ms: Optional request timeout in milliseconds (default: 60000 ms = 60s).
         ctx: Optional FastMCP request context.
+
+    Note:
+        For standalone full models (open-models), use 'open_model_inference' tool instead.
 
     Returns:
         Extraction results with detected entities and spans.
@@ -66,7 +72,7 @@ async def extract_inference(
         text=text,
         labels=labels,
         threshold=threshold,
-        model_id=model_id,
+        adapter_id=adapter_id,
         server_url=server_url,
         http_headers=headers,
         timeout_ms=timeout_ms,
@@ -78,7 +84,7 @@ async def comprehend_inference(
     text: str,
     labels: List[str],
     threshold: Optional[float] = None,
-    model_id: Optional[str] = None,
+    adapter_id: Optional[str] = None,
     timeout_ms: Optional[int] = 60000,
     ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
@@ -88,9 +94,12 @@ async def comprehend_inference(
         text: Input text to categorize or comprehend.
         labels: List of candidate classification labels.
         threshold: Optional confidence threshold (0.0 to 1.0).
-        model_id: Optional model identifier override.
+        adapter_id: Optional LoRA adapter ID for fine-tuned adapters (attaches KnowledgatorAPI-Model-ID header).
         timeout_ms: Optional request timeout in milliseconds (default: 60000 ms = 60s).
         ctx: Optional FastMCP request context.
+
+    Note:
+        For standalone full models (open-models), use 'open_model_inference' tool instead.
 
     Returns:
         Classification results with label confidence scores.
@@ -100,9 +109,37 @@ async def comprehend_inference(
         text=text,
         labels=labels,
         threshold=threshold,
-        model_id=model_id,
+        adapter_id=adapter_id,
         server_url=server_url,
         http_headers=headers,
         timeout_ms=timeout_ms,
     )
+    return serialize(response)
+
+
+async def open_model_inference(
+    model_id: str,
+    data: Dict[str, Any],
+    method: Optional[str] = None,
+    timeout_ms: Optional[int] = 60000,
+    ctx: Optional[Context] = None,
+) -> Dict[str, Any]:
+    """Executes prediction on a standalone full Open Model (POST /inference/{model_id}/).
+
+    Args:
+        model_id: The Open Model identifier (e.g. 'm-d9be7ede307943439a30c6f814026566').
+        data: Inference input dictionary containing task payload (e.g. {'text': '...', 'labels': [...]}).
+        method: Optional sub-method (e.g. 'relations' for /inference/{model_id}/{method}/).
+        timeout_ms: Request timeout in milliseconds (default: 60000 ms = 60s).
+        ctx: Optional FastMCP request context.
+
+    Returns:
+        Prediction outputs returned by the Open Model.
+    """
+    client, server_url, headers = get_client_context(ctx=ctx)
+    model_api = client.model(model_id=model_id, method=method)
+    if method:
+        response = await model_api.call_async(method=method, body=data, timeout_ms=timeout_ms)
+    else:
+        response = await model_api.predict_async(body=data, timeout_ms=timeout_ms)
     return serialize(response)

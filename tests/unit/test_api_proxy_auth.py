@@ -83,7 +83,7 @@ async def test_api_proxy_alice_bob_concurrency():
 
     captured_calls = []
 
-    async def mock_it_async(text, template=None, output_type=None, model_id=None, server_url=None, http_headers=None, timeout_ms=60000):
+    async def mock_it_async(text, template=None, output_type=None, model_id=None, adapter_id=None, server_url=None, http_headers=None, timeout_ms=60000, **kwargs):
         # Simulate async work delay to test race condition resistance
         await asyncio.sleep(0.01)
         captured_calls.append({
