@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "knowledgator-mcp"
-version = "0.4.0"
+version = "0.4.1"
 description = "Python MCP server for the Knowledgator API"
 authors = ["Knowledgator <info@knowledgator.com>"]
 license = "Apache-2.0"
