@@ -8,8 +8,11 @@ from knowledgator_mcp.config import settings
 from knowledgator_mcp.tools import dataset_tools, finetuning_tools, inference_tools
 from mcp.server.transport_security import TransportSecuritySettings
 
-transport_security = TransportSecuritySettings(enable_dns_rebinding_protection=False)
-
+transport_security = TransportSecuritySettings(
+    enable_dns_rebinding_protection=settings.enable_dns_rebinding_protection,
+    allowed_hosts=list(settings.allowed_hosts),
+    allowed_origins=list(settings.allowed_origins),
+)
 
 mcp = FastMCP(
     name=settings.server_name,
@@ -70,8 +73,37 @@ def main() -> None:
         default=8000,
         help="Port for SSE server (default: 8000)",
     )
+    parser.add_argument(
+        "--allowed-hosts",
+        default=None,
+        help="Comma-separated list of allowed Host header values (e.g. 'mcp.example.com,localhost:*')",
+    )
+    parser.add_argument(
+        "--allowed-origins",
+        default=None,
+        help="Comma-separated list of allowed Origin header values (e.g. 'https://example.ai')",
+    )
+    parser.add_argument(
+        "--disable-dns-protection",
+        action="store_true",
+        default=False,
+        help="Disable DNS rebinding protection (not recommended for production)",
+    )
 
     args = parser.parse_args()
+
+    # Apply transport security overrides if provided via CLI
+    if mcp.settings.transport_security:
+        if args.allowed_hosts is not None:
+            mcp.settings.transport_security.allowed_hosts = [
+                h.strip() for h in args.allowed_hosts.split(",") if h.strip()
+            ]
+        if args.allowed_origins is not None:
+            mcp.settings.transport_security.allowed_origins = [
+                o.strip() for o in args.allowed_origins.split(",") if o.strip()
+            ]
+        if args.disable_dns_protection:
+            mcp.settings.transport_security.enable_dns_rebinding_protection = False
 
     try:
         if args.transport == "stdio":
