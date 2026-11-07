@@ -22,7 +22,7 @@ packages = [{include = "knowledgator_mcp"}]
 
 [tool.poetry.dependencies]
 python = "^3.11"
-mcp = ">=1.3.0,<2.0.0"
+mcp = ">=1.12.0,<2.0.0"
 pydantic = "^2.7.0"
 pydantic-settings = "^2.2.0"
 uvicorn = "^0.30.0"
