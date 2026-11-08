@@ -63,20 +63,20 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run Knowledgator FastMCP Server")
     parser.add_argument(
         "--transport",
-        choices=["stdio", "sse"],
-        default="stdio",
-        help="Transport type to run the server on (default: stdio)",
+        choices=["stdio", "sse", "streamable-http"],
+        default="streamable-http",
+        help="Transport type to run the server on (default: streamable-http)",
     )
     parser.add_argument(
         "--host",
         default="127.0.0.1",
-        help="Host interface for SSE server (default: 127.0.0.1)",
+        help="Host interface for server (default: 127.0.0.1)",
     )
     parser.add_argument(
         "--port",
         type=int,
         default=8000,
-        help="Port for SSE server (default: 8000)",
+        help="Port for server (default: 8000)",
     )
     parser.add_argument(
         "--allowed-hosts",
@@ -113,7 +113,7 @@ def main() -> None:
     try:
         if args.transport == "stdio":
             mcp.run(transport="stdio")
-        elif args.transport == "sse":
+        elif args.transport in ("sse", "streamable-http"):
             mcp.settings.host = args.host
             mcp.settings.port = args.port
 
@@ -123,7 +123,11 @@ def main() -> None:
                 import uvicorn
                 from knowledgator_mcp.auth.middleware import APIKeyCaptureMiddleware
 
-                starlette_app = mcp.sse_app()
+                if args.transport == "streamable-http":
+                    starlette_app = mcp.streamable_http_app()
+                else:
+                    starlette_app = mcp.sse_app()
+
                 wrapped_app = APIKeyCaptureMiddleware(starlette_app)
 
                 config = uvicorn.Config(
@@ -136,7 +140,7 @@ def main() -> None:
                 asyncio.run(server.serve())
             else:
                 # Dedicated / Self-Hosted (auth_type == 'api_key') -> run native FastMCP directly
-                mcp.run(transport="sse")
+                mcp.run(transport=args.transport)
         else:
             sys.exit(1)
     finally:
