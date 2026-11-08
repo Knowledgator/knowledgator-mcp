@@ -3,15 +3,15 @@ Unit tests verifying DNS rebinding protection and transport security configurati
 All tests run 100% offline with zero API key dependencies.
 """
 import pytest
-from starlette.datastructures import Headers
 from starlette.requests import Request
 from starlette.responses import Response
+from starlette.datastructures import Headers
+from mcp.server.transport_security import (
+    TransportSecuritySettings,
+    TransportSecurityMiddleware,
+)
 
 from knowledgator_mcp.config import ServerConfig
-from mcp.server.transport_security import (
-    TransportSecurityMiddleware,
-    TransportSecuritySettings,
-)
 
 
 def _build_mock_request(host: str = "localhost:8000", origin: str | None = None, method: str = "GET") -> Request:
@@ -49,7 +49,7 @@ def test_transport_security_config_comma_separated_parsing():
     config = ServerConfig(
         _env_file=None,
         allowed_hosts="mcp.example.com, knowledgator-mcp:8000, knowledgator-mcp.default.svc.cluster.local:*",
-        allowed_origins="https://claude.ai, https://mcp.example.com",
+        allowed_origins="https://example.ai, https://mcp.example.com",
     )
     assert config.allowed_hosts == [
         "mcp.example.com",
@@ -57,7 +57,7 @@ def test_transport_security_config_comma_separated_parsing():
         "knowledgator-mcp.default.svc.cluster.local:*",
     ]
     assert config.allowed_origins == [
-        "https://claude.ai",
+        "https://example.ai",
         "https://mcp.example.com",
     ]
 
@@ -147,12 +147,12 @@ async def test_origin_validation():
     settings = TransportSecuritySettings(
         enable_dns_rebinding_protection=True,
         allowed_hosts=["mcp.example.com"],
-        allowed_origins=["https://claude.ai"],
+        allowed_origins=["https://example.ai"],
     )
     middleware = TransportSecurityMiddleware(settings)
 
     # Allowed origin passes
-    req_allowed = _build_mock_request(host="mcp.example.com", origin="https://claude.ai")
+    req_allowed = _build_mock_request(host="mcp.example.com", origin="https://example.ai")
     res_allowed = await middleware.validate_request(req_allowed)
     assert res_allowed is None
 
