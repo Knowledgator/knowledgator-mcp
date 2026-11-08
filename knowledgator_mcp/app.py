@@ -25,6 +25,8 @@ mcp.tool()(dataset_tools.generate_dataset_plan)
 mcp.tool()(dataset_tools.start_dataset_generation)
 mcp.tool()(dataset_tools.list_datasets)
 mcp.tool()(dataset_tools.get_dataset_details)
+mcp.tool()(dataset_tools.get_dataset_analytics_report)
+mcp.tool()(dataset_tools.list_data)
 mcp.tool()(dataset_tools.download_dataset)
 mcp.tool()(dataset_tools.upload_dataset)
 
@@ -34,6 +36,9 @@ mcp.tool()(finetuning_tools.start_training_job)
 mcp.tool()(finetuning_tools.get_training_status)
 mcp.tool()(finetuning_tools.list_trainings)
 mcp.tool()(finetuning_tools.stop_training_job)
+mcp.tool()(finetuning_tools.get_model_details)
+mcp.tool()(finetuning_tools.get_inference_details)
+mcp.tool()(finetuning_tools.get_training_metrics_report)
 
 # Register Inference Tools
 mcp.tool()(inference_tools.instruct_inference)
