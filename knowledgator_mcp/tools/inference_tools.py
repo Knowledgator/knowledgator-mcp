@@ -14,10 +14,10 @@ async def instruct_inference(
     timeout_ms: Optional[int] = 60000,
     ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
-    """Executes instruction task using Knowledgator Instruct API.
+    """Instruction task. Use when model's inference='instruct-it' or for default Instruct-It service.
 
     Args:
-        text: Main prompt instruction or text query.
+        text: prompt/instruction.
         template: Optional JSON schema template string the output should follow.
         output_type: Optional hint for desired output format (json, string, markdown, etc.).
         adapter_id: Optional LoRA adapter ID for fine-tuned adapters (attaches KnowledgatorAPI-Model-ID header).
@@ -28,7 +28,7 @@ async def instruct_inference(
         For standalone full models (open-models), use 'open_model_inference' tool instead.
 
     Returns:
-        Structured instruct result output.
+        Instruct result.
     """
     client, server_url, headers = get_client_context(ctx=ctx)
     response = await client.instruct.it_async(
@@ -51,10 +51,10 @@ async def extract_inference(
     timeout_ms: Optional[int] = 60000,
     ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
-    """Executes entity/relation extraction on text.
+    """Entity/relation extraction. Use when model's inference='extract-it' or for default Extract-It service.
 
     Args:
-        text: Target input text to extract entities or relations from.
+        text: Input text to extract entities or relations from.
         labels: List of target entity/relation labels to extract.
         threshold: Optional confidence threshold float (0.0 to 1.0).
         adapter_id: Optional LoRA adapter ID for fine-tuned adapters (attaches KnowledgatorAPI-Model-ID header).
@@ -65,7 +65,7 @@ async def extract_inference(
         For standalone full models (open-models), use 'open_model_inference' tool instead.
 
     Returns:
-        Extraction results with detected entities and spans.
+        Extraction results.
     """
     client, server_url, headers = get_client_context(ctx=ctx)
     response = await client.extract.it_async(
@@ -88,12 +88,12 @@ async def comprehend_inference(
     timeout_ms: Optional[int] = 60000,
     ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
-    """Executes text classification and zero-shot comprehension.
+    """Text classification. Use when model's inference='comprehend-it' or for default Comprehend-It service.
 
     Args:
-        text: Input text to categorize or comprehend.
+        text: Input text.
         labels: List of candidate classification labels.
-        threshold: Optional confidence threshold (0.0 to 1.0).
+        threshold: Optional confidence threshold (0.0-1.0).
         adapter_id: Optional LoRA adapter ID for fine-tuned adapters (attaches KnowledgatorAPI-Model-ID header).
         timeout_ms: Optional request timeout in milliseconds (default: 60000 ms = 60s).
         ctx: Optional FastMCP request context.
@@ -102,7 +102,7 @@ async def comprehend_inference(
         For standalone full models (open-models), use 'open_model_inference' tool instead.
 
     Returns:
-        Classification results with label confidence scores.
+        Classification results.
     """
     client, server_url, headers = get_client_context(ctx=ctx)
     response = await client.comprehend.it_async(

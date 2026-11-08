@@ -21,6 +21,7 @@ class ServerConfig(BaseSettings):
     api_key: Optional[str] = None
     base_url: str = "https://api.knowledgator.com"
     request_timeout_ms: int = 60000
+    platform_frontend_url: str = "https://platform.knowledgator.com"
 
     # Transport Security & DNS Rebinding Protection
     enable_dns_rebinding_protection: bool = True

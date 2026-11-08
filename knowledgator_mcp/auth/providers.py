@@ -133,5 +133,3 @@ class APIProxyAuthProvider(BaseAuthProvider):
 
     def get_base_url(self) -> str:
         return self.base_url
-
-

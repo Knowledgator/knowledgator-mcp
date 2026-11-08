@@ -50,4 +50,4 @@ COPY --from=builder /app/pyproject.toml /app/pyproject.toml
 EXPOSE 8000
 
 ENTRYPOINT ["python", "-m", "knowledgator_mcp.app"]
-CMD ["--transport", "sse", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["--transport", "streamable-http", "--host", "0.0.0.0", "--port", "8000"]
