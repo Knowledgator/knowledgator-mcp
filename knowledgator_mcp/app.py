@@ -1,12 +1,62 @@
 import argparse
+import logging
 import sys
 from typing import Any
+
+import anyio
 from mcp.server.fastmcp import FastMCP
 
 from knowledgator_mcp.client import close_kg_client
 from knowledgator_mcp.config import settings
 from knowledgator_mcp.tools import dataset_tools, finetuning_tools, inference_tools
 from mcp.server.transport_security import TransportSecuritySettings
+
+logger = logging.getLogger(__name__)
+
+
+def _patch_fastmcp_streamable_http_cleanup() -> None:
+    """Patches FastMCP StreamableHTTPServerTransport to cleanly close streams on session termination."""
+    try:
+        from mcp.server.streamable_http import StreamableHTTPServerTransport
+
+        stream_logger = logging.getLogger("mcp.server.streamable_http")
+
+        async def _graceful_clean_up_memory_streams(self: Any, request_id: Any) -> None:
+            if request_id in self._request_streams:
+                stream_pair = self._request_streams.get(request_id)
+                if stream_pair:
+                    send_stream, recv_stream = stream_pair
+                    # Close writer first: reader receives EOF and exits async for loop cleanly
+                    try:
+                        await send_stream.aclose()
+                    except Exception as e:
+                        stream_logger.error(
+                            "Error closing send stream for request %s: %s", request_id, e, exc_info=True
+                        )
+
+                    # Yield control to event loop so the reader task processes EOF and exits
+                    try:
+                        await anyio.sleep(0)
+                    except Exception as e:
+                        stream_logger.error(
+                            "Error yielding to event loop for request %s: %s", request_id, e, exc_info=True
+                        )
+
+                    # Close reader safely
+                    try:
+                        await recv_stream.aclose()
+                    except Exception as e:
+                        stream_logger.error(
+                            "Error closing recv stream for request %s: %s", request_id, e, exc_info=True
+                        )
+                self._request_streams.pop(request_id, None)
+
+        StreamableHTTPServerTransport._clean_up_memory_streams = _graceful_clean_up_memory_streams
+    except Exception as e:
+        logger.debug("Failed to patch FastMCP stream cleanup: %s", e)
+
+
+_patch_fastmcp_streamable_http_cleanup()
 
 transport_security = TransportSecuritySettings(
     enable_dns_rebinding_protection=settings.enable_dns_rebinding_protection,
