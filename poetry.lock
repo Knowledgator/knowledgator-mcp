@@ -786,7 +786,7 @@ pydantic = ">=2.10.3"
 type = "git"
 url = "ssh://git@github.com/Knowledgator/knowledgator-sdk.py.git"
 reference = "main"
-resolved_reference = "5048c9d4ecc971e2ad1e3feae0920df40e0c2bbd"
+resolved_reference = "4d2f1565082991b0e2bb425ae49790912e68a277"
 
 [[package]]
 name = "markdown-it-py"
@@ -2418,4 +2418,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "c84479e4be5d0d38792cf458da5bbad4b5dea9da29dbf67aa1e5d9fca7281973"
+content-hash = "1765e9f22799159c84b3f89f46ec966d440be333d043a4692d687600ab8f7833"
