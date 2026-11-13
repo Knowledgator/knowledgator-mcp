@@ -51,7 +51,7 @@ async def test_comprehend_inference_with_adapter_id(mock_client_context):
 
 
 @pytest.mark.asyncio
-async def test_comprehend_inference_legacy_model_id_fallback(mock_client_context):
+async def test_comprehend_inference_without_adapter_id(mock_client_context):
     mock_client, server_url, headers = mock_client_context
     mock_resp = MagicMock()
     mock_resp.model_dump.return_value = {
@@ -59,18 +59,18 @@ async def test_comprehend_inference_legacy_model_id_fallback(mock_client_context
     }
     mock_client.comprehend.it_async = AsyncMock(return_value=mock_resp)
 
+    tasks = {"topic": {"type": "classify", "labels": ["tech", "sports"]}}
     with patch("knowledgator_mcp.tools.inference_tools.get_client_context", return_value=(mock_client, server_url, headers)):
         res = await inference_tools.comprehend_inference(
             text="Sample text",
-            labels=["tech", "sports"],
-            adapter_id="adapter-comprehend-1",
+            tasks=tasks,
         )
 
     assert "topic" in res["results"]
     mock_client.comprehend.it_async.assert_awaited_once_with(
         text="Sample text",
-        tasks={"topic": {"type": "classify", "labels": ["tech", "sports"]}},
-        adapter_id="adapter-comprehend-1",
+        tasks=tasks,
+        adapter_id=None,
         server_url=server_url,
         http_headers=headers,
         timeout_ms=60000,
@@ -112,7 +112,7 @@ async def test_extract_inference_with_adapter_id(mock_client_context):
 
 
 @pytest.mark.asyncio
-async def test_extract_inference_labels_auto_wrap(mock_client_context):
+async def test_extract_inference_without_adapter_id(mock_client_context):
     mock_client, server_url, headers = mock_client_context
     mock_resp = MagicMock()
     mock_resp.model_dump.return_value = {
@@ -120,18 +120,18 @@ async def test_extract_inference_labels_auto_wrap(mock_client_context):
     }
     mock_client.extract.it_async = AsyncMock(return_value=mock_resp)
 
+    tasks = {"entities": {"type": "span", "labels": ["ORG"]}}
     with patch("knowledgator_mcp.tools.inference_tools.get_client_context", return_value=(mock_client, server_url, headers)):
         res = await inference_tools.extract_inference(
             text="Apple announced a new product.",
-            labels=["ORG"],
-            adapter_id="adapter-extract-1",
+            tasks=tasks,
         )
 
     assert "entities" in res["results"]
     mock_client.extract.it_async.assert_awaited_once_with(
         text="Apple announced a new product.",
-        tasks={"entities": {"type": "span", "labels": ["ORG"]}},
-        adapter_id="adapter-extract-1",
+        tasks=tasks,
+        adapter_id=None,
         server_url=server_url,
         http_headers=headers,
         timeout_ms=60000,

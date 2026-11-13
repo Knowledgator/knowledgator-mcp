@@ -37,33 +37,11 @@ async def test_comprehend_inference():
 
 
 @pytest.mark.asyncio
-async def test_comprehend_inference_with_labels_fallback():
-    """Verify comprehend_inference MCP tool auto-wraps legacy labels into tasks."""
-    result = await inference_tools.comprehend_inference(
-        text="Apple announced a new iPad with advanced artificial intelligence features.",
-        labels=["technology", "business", "sports", "entertainment"],
-    )
-    assert isinstance(result, dict)
-    assert "results" in result or "outputs" in result
-
-
-@pytest.mark.asyncio
 async def test_extract_inference():
     """Verify extract_inference MCP tool against live API using tasks."""
     result = await inference_tools.extract_inference(
         text="Steve Jobs co-founded Apple Inc. in California.",
         tasks={"entities": {"type": "span", "labels": ["person", "organization", "location"]}},
-    )
-    assert isinstance(result, dict)
-    assert "results" in result or "outputs" in result
-
-
-@pytest.mark.asyncio
-async def test_extract_inference_with_labels_fallback():
-    """Verify extract_inference MCP tool auto-wraps legacy labels into tasks."""
-    result = await inference_tools.extract_inference(
-        text="Steve Jobs co-founded Apple Inc. in California.",
-        labels=["person", "organization", "location"],
     )
     assert isinstance(result, dict)
     assert "results" in result or "outputs" in result
