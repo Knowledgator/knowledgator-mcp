@@ -770,7 +770,7 @@ referencing = ">=0.31.0"
 
 [[package]]
 name = "knowledgator"
-version = "0.0.1"
+version = "1.0.0"
 description = "Python client SDK for the Knowledgator API"
 optional = false
 python-versions = ">=3.9,<4.0"
@@ -780,13 +780,14 @@ develop = false
 
 [package.dependencies]
 httpx = ">=0.28.1"
+jsonschema = ">=4.0.0"
 pydantic = ">=2.10.3"
 
 [package.source]
 type = "git"
 url = "ssh://git@github.com/Knowledgator/knowledgator-sdk.py.git"
 reference = "main"
-resolved_reference = "4d2f1565082991b0e2bb425ae49790912e68a277"
+resolved_reference = "53fca693073bfa9378c678a5a18dc791ccfad686"
 
 [[package]]
 name = "markdown-it-py"
