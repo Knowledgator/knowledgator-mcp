@@ -149,9 +149,9 @@ async def get_model_details(
 
     IMPORTANT: Call this BEFORE running inference on a fine-tuned model to check
     what inference method to use:
-    - If 'type' is 'extract-it': use extract_inference with model_id
-    - If 'type' is 'comprehend-it': use comprehend_inference with model_id
-    - If 'type' is 'instruct-it': use instruct_inference with model_id
+    - If 'type' is 'extract-it': use extract_inference with adapter_id
+    - If 'type' is 'comprehend-it': use comprehend_inference with adapter_id
+    - If 'type' is 'instruct-it': use instruct_inference with adapter_id
 
     The 'training_model' and 'training_adapter' fields indicate what training
     types this model supports (for base models).
