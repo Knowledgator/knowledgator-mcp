@@ -1,3 +1,4 @@
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
@@ -19,24 +20,29 @@ async def test_comprehend_inference_with_adapter_id(mock_client_context):
     mock_client, server_url, headers = mock_client_context
     mock_resp = MagicMock()
     mock_resp.model_dump.return_value = {
-        "results": [{"label": "tech", "score": 0.99}],
+        "results": {"topic": {"value": [{"label": "tech", "score": 0.99}]}},
         "input_text": "Sample text",
-        "labels": ["tech", "sports"],
     }
     mock_client.comprehend.it_async = AsyncMock(return_value=mock_resp)
+
+    tasks_payload = {
+        "topic": {
+            "type": "classify",
+            "labels": ["tech", "sports"],
+        }
+    }
 
     with patch("knowledgator_mcp.tools.inference_tools.get_client_context", return_value=(mock_client, server_url, headers)):
         res = await inference_tools.comprehend_inference(
             text="Sample text",
-            labels=["tech", "sports"],
+            tasks=tasks_payload,
             adapter_id="adapter-lora-1",
         )
 
-    assert res["results"][0]["label"] == "tech"
+    assert "topic" in res["results"]
     mock_client.comprehend.it_async.assert_awaited_once_with(
         text="Sample text",
-        labels=["tech", "sports"],
-        threshold=None,
+        tasks=tasks_payload,
         adapter_id="adapter-lora-1",
         server_url=server_url,
         http_headers=headers,
@@ -48,7 +54,9 @@ async def test_comprehend_inference_with_adapter_id(mock_client_context):
 async def test_comprehend_inference_legacy_model_id_fallback(mock_client_context):
     mock_client, server_url, headers = mock_client_context
     mock_resp = MagicMock()
-    mock_resp.model_dump.return_value = {"results": [{"label": "sports", "score": 0.95}]}
+    mock_resp.model_dump.return_value = {
+        "results": {"topic": {"value": [{"label": "sports", "score": 0.95}]}}
+    }
     mock_client.comprehend.it_async = AsyncMock(return_value=mock_resp)
 
     with patch("knowledgator_mcp.tools.inference_tools.get_client_context", return_value=(mock_client, server_url, headers)):
@@ -58,11 +66,10 @@ async def test_comprehend_inference_legacy_model_id_fallback(mock_client_context
             adapter_id="adapter-comprehend-1",
         )
 
-    assert res["results"][0]["label"] == "sports"
+    assert "topic" in res["results"]
     mock_client.comprehend.it_async.assert_awaited_once_with(
         text="Sample text",
-        labels=["tech", "sports"],
-        threshold=None,
+        tasks={"topic": {"type": "classify", "labels": ["tech", "sports"]}},
         adapter_id="adapter-comprehend-1",
         server_url=server_url,
         http_headers=headers,
@@ -75,7 +82,41 @@ async def test_extract_inference_with_adapter_id(mock_client_context):
     mock_client, server_url, headers = mock_client_context
     mock_resp = MagicMock()
     mock_resp.model_dump.return_value = {
-        "results": [{"span": "Apple", "entity": "ORG", "score": 0.98}],
+        "results": {"entities": {"value": [{"span": "Apple", "entity": "ORG", "score": 0.98}]}},
+    }
+    mock_client.extract.it_async = AsyncMock(return_value=mock_resp)
+
+    tasks_payload = {
+        "entities": {
+            "type": "span",
+            "labels": ["ORG"],
+        }
+    }
+
+    with patch("knowledgator_mcp.tools.inference_tools.get_client_context", return_value=(mock_client, server_url, headers)):
+        res = await inference_tools.extract_inference(
+            text="Apple announced a new product.",
+            tasks=tasks_payload,
+            adapter_id="adapter-extract-1",
+        )
+
+    assert "entities" in res["results"]
+    mock_client.extract.it_async.assert_awaited_once_with(
+        text="Apple announced a new product.",
+        tasks=tasks_payload,
+        adapter_id="adapter-extract-1",
+        server_url=server_url,
+        http_headers=headers,
+        timeout_ms=60000,
+    )
+
+
+@pytest.mark.asyncio
+async def test_extract_inference_labels_auto_wrap(mock_client_context):
+    mock_client, server_url, headers = mock_client_context
+    mock_resp = MagicMock()
+    mock_resp.model_dump.return_value = {
+        "results": {"entities": {"value": [{"span": "Apple", "entity": "ORG", "score": 0.98}]}},
     }
     mock_client.extract.it_async = AsyncMock(return_value=mock_resp)
 
@@ -86,11 +127,10 @@ async def test_extract_inference_with_adapter_id(mock_client_context):
             adapter_id="adapter-extract-1",
         )
 
-    assert res["results"][0]["span"] == "Apple"
+    assert "entities" in res["results"]
     mock_client.extract.it_async.assert_awaited_once_with(
         text="Apple announced a new product.",
-        labels=["ORG"],
-        threshold=None,
+        tasks={"entities": {"type": "span", "labels": ["ORG"]}},
         adapter_id="adapter-extract-1",
         server_url=server_url,
         http_headers=headers,
@@ -105,18 +145,63 @@ async def test_instruct_inference_with_adapter_id(mock_client_context):
     mock_resp.model_dump.return_value = {"outputs": "Extracted summary"}
     mock_client.instruct.it_async = AsyncMock(return_value=mock_resp)
 
+    template = {"summary": ""}
     with patch("knowledgator_mcp.tools.inference_tools.get_client_context", return_value=(mock_client, server_url, headers)):
         res = await inference_tools.instruct_inference(
             text="Summarize this text",
+            template=template,
             adapter_id="adapter-instruct-1",
         )
 
     assert res["outputs"] == "Extracted summary"
     mock_client.instruct.it_async.assert_awaited_once_with(
         text="Summarize this text",
-        template=None,
+        template=json.dumps(template),
         output_type=None,
         adapter_id="adapter-instruct-1",
+        server_url=server_url,
+        http_headers=headers,
+        timeout_ms=60000,
+    )
+
+
+@pytest.mark.asyncio
+async def test_instruct_inference_with_dict_template(mock_client_context):
+    mock_client, server_url, headers = mock_client_context
+    mock_resp = MagicMock()
+    mock_resp.model_dump.return_value = {
+        "outputs": [
+            {"name": "Elon Musk", "company": "Tesla", "role": "CEO", "location": "Austin"}
+        ]
+    }
+    mock_client.instruct.it_async = AsyncMock(return_value=mock_resp)
+
+    text = """
+    Elon Musk is CEO of Tesla in Austin. Tim Cook leads Apple in Cupertino.
+    Satya Nadella runs Microsoft in Redmond.
+    """
+    template = {
+        "name": "",
+        "company": "",
+        "role": "",
+        "location": ""
+    }
+
+    with patch("knowledgator_mcp.tools.inference_tools.get_client_context", return_value=(mock_client, server_url, headers)):
+        res = await inference_tools.instruct_inference(
+            text=text,
+            template=template,
+            output_type="json",
+        )
+
+    assert "outputs" in res
+    assert res["outputs"][0]["name"] == "Elon Musk"
+    import json
+    mock_client.instruct.it_async.assert_awaited_once_with(
+        text=text,
+        template=json.dumps(template),
+        output_type="json",
+        adapter_id=None,
         server_url=server_url,
         http_headers=headers,
         timeout_ms=60000,

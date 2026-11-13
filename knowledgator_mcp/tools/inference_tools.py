@@ -1,4 +1,5 @@
-from typing import Any, Dict, List, Optional
+import json
+from typing import Any, Dict, List, Optional, Union
 
 from mcp.server.fastmcp import Context
 
@@ -8,7 +9,7 @@ from knowledgator_mcp.client import get_client_context
 
 async def instruct_inference(
     text: str,
-    template: Optional[str] = None,
+    template: Union[str, Dict[str, Any]],
     output_type: Optional[str] = None,
     adapter_id: Optional[str] = None,
     timeout_ms: Optional[int] = 60000,
@@ -18,7 +19,7 @@ async def instruct_inference(
 
     Args:
         text: prompt/instruction.
-        template: Optional JSON schema template string the output should follow.
+        template: JSON schema template string or dictionary the output should follow (required).
         output_type: Optional hint for desired output format (json, string, markdown, etc.).
         adapter_id: Optional LoRA adapter ID for fine-tuned adapters (attaches KnowledgatorAPI-Model-ID header).
         timeout_ms: Optional request timeout in milliseconds (default: 60000 ms = 60s).
@@ -31,9 +32,10 @@ async def instruct_inference(
         Instruct result.
     """
     client, server_url, headers = get_client_context(ctx=ctx)
+    template_str = json.dumps(template) if isinstance(template, dict) else template
     response = await client.instruct.it_async(
         text=text,
-        template=template,
+        template=template_str,
         output_type=output_type,
         adapter_id=adapter_id,
         server_url=server_url,
@@ -45,9 +47,11 @@ async def instruct_inference(
 
 async def extract_inference(
     text: str,
-    labels: List[str],
+    tasks: Optional[Dict[str, Any]] = None,
+    labels: Optional[List[str]] = None,
     threshold: Optional[float] = None,
     adapter_id: Optional[str] = None,
+    model_id: Optional[str] = None,
     timeout_ms: Optional[int] = 60000,
     ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
@@ -55,9 +59,12 @@ async def extract_inference(
 
     Args:
         text: Input text to extract entities or relations from.
-        labels: List of target entity/relation labels to extract.
+        tasks: Optional dictionary of extraction tasks following the Unified Inference API
+            (e.g., {"entities": {"type": "span", "labels": ["person", "location"], "threshold": 0.5}}).
+        labels: Optional list of target entity/relation labels to extract (wrapped into a 'span' task if tasks not supplied).
         threshold: Optional confidence threshold float (0.0 to 1.0).
         adapter_id: Optional LoRA adapter ID for fine-tuned adapters (attaches KnowledgatorAPI-Model-ID header).
+        model_id: Optional alias for adapter_id.
         timeout_ms: Optional request timeout in milliseconds (default: 60000 ms = 60s).
         ctx: Optional FastMCP request context.
 
@@ -68,11 +75,22 @@ async def extract_inference(
         Extraction results.
     """
     client, server_url, headers = get_client_context(ctx=ctx)
+    eff_adapter_id = adapter_id or model_id
+    if tasks is None:
+        if labels is None:
+            raise ValueError("Either 'tasks' or 'labels' must be provided for extract_inference.")
+        task_def: Dict[str, Any] = {
+            "type": "span",
+            "labels": labels,
+        }
+        if threshold is not None:
+            task_def["threshold"] = threshold
+        tasks = {"entities": task_def}
+
     response = await client.extract.it_async(
         text=text,
-        labels=labels,
-        threshold=threshold,
-        adapter_id=adapter_id,
+        tasks=tasks,
+        adapter_id=eff_adapter_id,
         server_url=server_url,
         http_headers=headers,
         timeout_ms=timeout_ms,
@@ -82,9 +100,11 @@ async def extract_inference(
 
 async def comprehend_inference(
     text: str,
-    labels: List[str],
+    tasks: Optional[Dict[str, Any]] = None,
+    labels: Optional[List[str]] = None,
     threshold: Optional[float] = None,
     adapter_id: Optional[str] = None,
+    model_id: Optional[str] = None,
     timeout_ms: Optional[int] = 60000,
     ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
@@ -92,9 +112,12 @@ async def comprehend_inference(
 
     Args:
         text: Input text.
-        labels: List of candidate classification labels.
+        tasks: Optional dictionary of classification tasks following the Unified Inference API
+            (e.g., {"topic": {"type": "classify", "labels": ["geography", "sport"], "threshold": 0.5}}).
+        labels: Optional list of candidate classification labels (wrapped into a 'classify' task if tasks not supplied).
         threshold: Optional confidence threshold (0.0-1.0).
         adapter_id: Optional LoRA adapter ID for fine-tuned adapters (attaches KnowledgatorAPI-Model-ID header).
+        model_id: Optional alias for adapter_id.
         timeout_ms: Optional request timeout in milliseconds (default: 60000 ms = 60s).
         ctx: Optional FastMCP request context.
 
@@ -105,11 +128,22 @@ async def comprehend_inference(
         Classification results.
     """
     client, server_url, headers = get_client_context(ctx=ctx)
+    eff_adapter_id = adapter_id or model_id
+    if tasks is None:
+        if labels is None:
+            raise ValueError("Either 'tasks' or 'labels' must be provided for comprehend_inference.")
+        task_def: Dict[str, Any] = {
+            "type": "classify",
+            "labels": labels,
+        }
+        if threshold is not None:
+            task_def["threshold"] = threshold
+        tasks = {"topic": task_def}
+
     response = await client.comprehend.it_async(
         text=text,
-        labels=labels,
-        threshold=threshold,
-        adapter_id=adapter_id,
+        tasks=tasks,
+        adapter_id=eff_adapter_id,
         server_url=server_url,
         http_headers=headers,
         timeout_ms=timeout_ms,

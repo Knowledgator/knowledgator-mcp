@@ -116,8 +116,8 @@ async def test_api_proxy_alice_bob_concurrency():
         mock_get_context.side_effect = side_effect
 
         # Run concurrent tool calls for Alice and Bob
-        alice_task = instruct_inference(text="Alice prompt", ctx=ctx_alice)
-        bob_task = instruct_inference(text="Bob prompt", ctx=ctx_bob)
+        alice_task = instruct_inference(text="Alice prompt", template={"summary": ""}, ctx=ctx_alice)
+        bob_task = instruct_inference(text="Bob prompt", template={"summary": ""}, ctx=ctx_bob)
 
         alice_res, bob_res = await asyncio.gather(alice_task, bob_task)
 
