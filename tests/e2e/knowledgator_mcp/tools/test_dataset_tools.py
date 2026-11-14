@@ -15,7 +15,7 @@ async def test_get_dataset_details_existing():
     result = await dataset_tools.list_datasets(limit=5)
     datasets = []
     if isinstance(result, dict):
-        datasets = result.get("datasets") or result.get("results") or result.get("data") or []
+        datasets = result.get("datasets") or result.get("data") or []
     elif isinstance(result, list):
         datasets = result
 

@@ -22,7 +22,7 @@ async def test_instruct_inference():
         output_type="json",
     )
     assert isinstance(result, dict)
-    assert "outputs" in result or "parsed" in result or "results" in result
+    assert "outputs" in result or "parsed" in result
 
 
 @pytest.mark.asyncio
@@ -33,7 +33,7 @@ async def test_comprehend_inference():
         tasks={"topic": {"type": "classify", "labels": ["technology", "business", "sports", "entertainment"]}},
     )
     assert isinstance(result, dict)
-    assert "results" in result or "outputs" in result
+    assert "outputs" in result
 
 
 @pytest.mark.asyncio
@@ -44,7 +44,7 @@ async def test_extract_inference():
         tasks={"entities": {"type": "span", "labels": ["person", "organization", "location"]}},
     )
     assert isinstance(result, dict)
-    assert "results" in result or "outputs" in result
+    assert "outputs" in result
 
 
 @pytest.mark.asyncio

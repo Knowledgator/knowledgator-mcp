@@ -20,7 +20,7 @@ async def test_comprehend_inference_with_adapter_id(mock_client_context):
     mock_client, server_url, headers = mock_client_context
     mock_resp = MagicMock()
     mock_resp.model_dump.return_value = {
-        "results": {"topic": {"value": [{"label": "tech", "score": 0.99}]}},
+        "outputs": {"topic": {"value": [{"label": "tech", "score": 0.99}]}},
         "input_text": "Sample text",
     }
     mock_client.comprehend.it_async = AsyncMock(return_value=mock_resp)
@@ -39,7 +39,7 @@ async def test_comprehend_inference_with_adapter_id(mock_client_context):
             adapter_id="adapter-lora-1",
         )
 
-    assert "topic" in res["results"]
+    assert "topic" in res["outputs"]
     mock_client.comprehend.it_async.assert_awaited_once_with(
         text="Sample text",
         tasks=tasks_payload,
@@ -55,7 +55,7 @@ async def test_comprehend_inference_without_adapter_id(mock_client_context):
     mock_client, server_url, headers = mock_client_context
     mock_resp = MagicMock()
     mock_resp.model_dump.return_value = {
-        "results": {"topic": {"value": [{"label": "sports", "score": 0.95}]}}
+        "outputs": {"topic": {"value": [{"label": "sports", "score": 0.95}]}}
     }
     mock_client.comprehend.it_async = AsyncMock(return_value=mock_resp)
 
@@ -66,7 +66,7 @@ async def test_comprehend_inference_without_adapter_id(mock_client_context):
             tasks=tasks,
         )
 
-    assert "topic" in res["results"]
+    assert "topic" in res["outputs"]
     mock_client.comprehend.it_async.assert_awaited_once_with(
         text="Sample text",
         tasks=tasks,
@@ -82,7 +82,7 @@ async def test_extract_inference_with_adapter_id(mock_client_context):
     mock_client, server_url, headers = mock_client_context
     mock_resp = MagicMock()
     mock_resp.model_dump.return_value = {
-        "results": {"entities": {"value": [{"span": "Apple", "entity": "ORG", "score": 0.98}]}},
+        "outputs": {"entities": {"value": [{"span": "Apple", "entity": "ORG", "score": 0.98}]}},
     }
     mock_client.extract.it_async = AsyncMock(return_value=mock_resp)
 
@@ -100,7 +100,7 @@ async def test_extract_inference_with_adapter_id(mock_client_context):
             adapter_id="adapter-extract-1",
         )
 
-    assert "entities" in res["results"]
+    assert "entities" in res["outputs"]
     mock_client.extract.it_async.assert_awaited_once_with(
         text="Apple announced a new product.",
         tasks=tasks_payload,
@@ -116,7 +116,7 @@ async def test_extract_inference_without_adapter_id(mock_client_context):
     mock_client, server_url, headers = mock_client_context
     mock_resp = MagicMock()
     mock_resp.model_dump.return_value = {
-        "results": {"entities": {"value": [{"span": "Apple", "entity": "ORG", "score": 0.98}]}},
+        "outputs": {"entities": {"value": [{"span": "Apple", "entity": "ORG", "score": 0.98}]}},
     }
     mock_client.extract.it_async = AsyncMock(return_value=mock_resp)
 
@@ -127,7 +127,7 @@ async def test_extract_inference_without_adapter_id(mock_client_context):
             tasks=tasks,
         )
 
-    assert "entities" in res["results"]
+    assert "entities" in res["outputs"]
     mock_client.extract.it_async.assert_awaited_once_with(
         text="Apple announced a new product.",
         tasks=tasks,
