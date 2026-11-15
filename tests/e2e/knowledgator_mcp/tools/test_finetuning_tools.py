@@ -6,9 +6,62 @@ from knowledgator_mcp.tools import dataset_tools, finetuning_tools
 
 @pytest.mark.asyncio
 async def test_list_trainings():
-    """Verify list_trainings MCP tool against live API."""
-    result = await finetuning_tools.list_trainings(limit=5)
+    """Verify list_trainings MCP tool against live API with status filtering."""
+    result = await finetuning_tools.list_trainings(status="completed", limit=10)
     assert isinstance(result, (dict, list))
+    if isinstance(result, dict):
+        assert "trainings" in result or "data" in result
+        trainings = result.get("trainings") or result.get("data") or []
+        for t in trainings:
+            assert t.get("status") == "completed"
+
+
+@pytest.mark.asyncio
+async def test_list_models_basic():
+    """Verify list_models MCP tool against live API and verify description is compact by default."""
+    result = await finetuning_tools.list_models(limit=5)
+    assert isinstance(result, dict)
+    assert "total" in result or "models" in result or "data" in result
+    models = result.get("models") or result.get("data") or []
+    assert len(models) > 0
+    first = models[0]
+    assert "id" in first
+    assert "url" in first
+    # Verify description is stripped to keep tool output small and prevent file dump
+    assert "description" not in first
+
+    # Verify include_description=True retains description
+    full_result = await finetuning_tools.list_models(limit=1, include_description=True)
+    full_models = full_result.get("models") or full_result.get("data") or []
+    assert len(full_models) > 0
+    assert "description" in full_models[0]
+
+
+@pytest.mark.asyncio
+async def test_get_model_details_e2e():
+    """Verify get_model_details returns full details on demand."""
+    ctx = None
+    res = await finetuning_tools.get_model_details(ctx=ctx, model_id="gliclass-small-v1-0")
+    assert isinstance(res, dict)
+    assert res.get("id") == "gliclass-small-v1-0"
+    assert "description" in res
+    assert "url" in res
+
+
+@pytest.mark.asyncio
+async def test_list_models_filtering():
+    """Verify list_models filtering by object_type and trainable."""
+    # Test object_type="model"
+    model_res = await finetuning_tools.list_models(object_type="model", limit=5)
+    assert isinstance(model_res, dict)
+    assert model_res.get("total", 0) > 0
+
+    # Test trainable="adapter"
+    trainable_res = await finetuning_tools.list_models(trainable="adapter", limit=5)
+    assert isinstance(trainable_res, dict)
+    models = trainable_res.get("models") or trainable_res.get("data") or []
+    adapter_models = [m.get("id") for m in models]
+    assert any(m in adapter_models for m in ["instruct-it", "comprehend-it", "extract-it"])
 
 
 @pytest.mark.asyncio
@@ -17,7 +70,7 @@ async def test_get_training_status_existing():
     result = await finetuning_tools.list_trainings(limit=5)
     trainings = []
     if isinstance(result, dict):
-        trainings = result.get("trainings") or result.get("results") or result.get("data") or []
+        trainings = result.get("trainings") or result.get("data") or []
     elif isinstance(result, list):
         trainings = result
 
