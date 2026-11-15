@@ -86,9 +86,13 @@ async def list_trainings(
     model_id: Optional[str] = None,
     dataset_id: Optional[str] = None,
     status: Optional[str] = None,
+    type: Optional[str] = None,
     ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
-    """Lists training jobs with optional status/model/dataset filtering.
+    """Lists training jobs with optional status/type/model/dataset filtering.
+
+    Use this tool to inspect user's training jobs and find custom-trained models or adapters.
+    Set status='completed' to see all user-trained models and adapters ready for inference.
 
     Args:
         offset: Pagination offset (default: 0).
@@ -96,6 +100,7 @@ async def list_trainings(
         model_id: Optional filter by base model ID.
         dataset_id: Optional filter by dataset ID.
         status: Optional status filter ('active', 'completed', 'failed', 'stopped').
+        type: Optional service type filter ('comprehend-it', 'extract-it', 'instruct-it').
         ctx: Optional FastMCP request context.
 
     Returns:
@@ -104,17 +109,72 @@ async def list_trainings(
     client, server_url, headers = get_client_context(ctx=ctx)
     if client.finetuning is None:
         raise RuntimeError("Finetuning API is not enabled for the current client configuration.")
-    response = client.finetuning.list_trainings(
+    response = await client.finetuning.list_trainings_async(
         offset=offset,
         limit=limit,
         model_id=model_id,
         dataset_id=dataset_id,
         status=status,
+        type=type,
         server_url=server_url,
         http_headers=headers,
     )
     result = serialize(response)
     return add_urls_to_list_response(result, "trainings", "trainings")
+
+
+async def list_models(
+    offset: int = 0,
+    limit: int = 20,
+    object_type: Optional[str] = None,
+    trainable: Optional[str] = None,
+    inference: Optional[str] = None,
+    type: Optional[str] = None,
+    name: Optional[str] = None,
+    include_description: bool = False,
+    ctx: Optional[Context] = None,
+) -> Dict[str, Any]:
+    """Lists available platform base models and public catalog adapters.
+
+    Queries the Knowledgator platform foundation model catalog with pure server-side filtering.
+    For user's custom-trained models and fine-tuned adapters, use list_trainings(status='completed').
+
+    Args:
+        offset: Pagination offset (default: 0).
+        limit: Maximum number of models to return (default: 20).
+        object_type: Filter by object type ('adapter' for LoRA adapters, 'model' for full models).
+        trainable: Filter by trainable capability ('adapter' for models supporting adapter training, 'model' for full model training).
+        inference: Filter by inference service ('open-models', 'comprehend-it', 'extract-it', 'instruct-it').
+        type: Optional filter by architecture/model type (e.g. 'GLiClass', 'GLiFormer').
+        name: Optional name filter substring.
+        include_description: Whether to include full markdown description (default False to keep response compact). Full description is always available via get_model_details.
+        ctx: Optional FastMCP request context.
+
+    Returns:
+        Dictionary with 'total', 'models' (or 'data') list of models, and pagination metadata.
+    """
+    client, server_url, headers = get_client_context(ctx=ctx)
+    if client.finetuning is None:
+        raise RuntimeError("Finetuning API is not enabled for the current client configuration.")
+
+    response = await client.finetuning.list_models_async(
+        offset=offset,
+        limit=limit,
+        object_type=object_type,
+        trainable=trainable,
+        inference=inference,
+        type=type,
+        name=name,
+        server_url=server_url,
+        http_headers=headers,
+    )
+    result = serialize(response)
+    items_key = "models" if isinstance(result, dict) and "models" in result else "data"
+    if not include_description and isinstance(result, dict) and items_key in result:
+        for item in result[items_key]:
+            if isinstance(item, dict):
+                item.pop("description", None)
+    return add_urls_to_list_response(result, "models", items_key)
 
 
 async def stop_training_job(
@@ -166,7 +226,7 @@ async def get_model_details(
     client, server_url, headers = get_client_context(ctx=ctx)
     if client.finetuning is None:
         raise RuntimeError("Finetuning API is not enabled for the current client configuration.")
-    response = client.finetuning.get_model(
+    response = await client.finetuning.get_model_async(
         model_id=model_id,
         server_url=server_url,
         http_headers=headers,

@@ -22,6 +22,7 @@ async def test_mcp_tools_registration():
     assert "start_training_job" in tool_names
     assert "get_training_status" in tool_names
     assert "list_trainings" in tool_names
+    assert "list_models" in tool_names
     assert "stop_training_job" in tool_names
     assert "get_model_details" in tool_names
     assert "get_inference_details" in tool_names
