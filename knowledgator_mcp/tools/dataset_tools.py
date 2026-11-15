@@ -23,7 +23,7 @@ async def generate_dataset_plan(
 
     NOTE: This tool is strictly for designing BRAND NEW datasets from scratch on the
     Knowledgator platform. DO NOT use this tool to remediate, audit, rebalance, or patch
-    existing local datasets (use the local dataset-plan / dataset-patch CLI tools instead).
+    existing local datasets.
 
     Args:
         prompt: User's description of what dataset they want (REQUIRED - ask user if not provided).
@@ -367,7 +367,7 @@ async def download_dataset(
     """Downloads an existing dataset by ID statelessly in memory.
 
     Streams chunks from the platform and passes the dataset samples/rows directly across
-    the MCP wire to the caller (e.g. sandbox sync script) without writing any files to
+    the MCP wire to the caller (e.g. dataset sync script) without writing any files to
     the MCP container disk.
 
     Args:
