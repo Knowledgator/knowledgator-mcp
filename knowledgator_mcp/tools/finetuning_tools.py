@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Dict, Optional
 
 import httpx
@@ -6,6 +7,8 @@ from mcp.server.fastmcp import Context
 from knowledgator_mcp.utils import serialize, add_url_to_object, add_urls_to_list_response
 from knowledgator_mcp.client import get_client_context
 from knowledgator_mcp.tools.reports import generate_training_metrics_report
+
+logger = logging.getLogger(__name__)
 
 
 async def start_training_job(
@@ -290,36 +293,28 @@ async def get_training_metrics_report(
     ))
 
     # Get loss metrics
-    loss_data = []
-    try:
-        loss_response = client.finetuning.get_metrics(
-            training_id=training_id,
-            metric="loss",
-            limit=500,
-            server_url=server_url,
-            http_headers=headers,
-        )
-        loss_data = serialize(loss_response).get("data", [])
-    except Exception:
-        pass
+    loss_response = client.finetuning.get_metrics(
+        training_id=training_id,
+        metric="loss",
+        limit=500,
+        server_url=server_url,
+        http_headers=headers,
+    )
+    loss_data = serialize(loss_response).get("data", [])
 
     # Get evaluation metrics from /trainings/{id}/evaluations/
-    eval_metrics = {}
-    try:
-        eval_url = f"{server_url.rstrip('/')}/trainings/{training_id}/evaluations/"
-        async with httpx.AsyncClient(timeout=30.0) as http_client:
-            eval_response = await http_client.get(eval_url, headers=headers)
-            eval_response.raise_for_status()
-            eval_metrics = eval_response.json()
-    except Exception:
-        pass
+    eval_metrics = client.finetuning.get_evaluations(
+        training_id=training_id,
+        server_url=server_url,
+        http_headers=headers,
+    )
 
-    # Get training events
-    svg_content = generate_training_metrics_report(
+    # Generate training report
+    report_content = generate_training_metrics_report(
         training_id=training_id,
         training_info=training_info,
         loss_metrics=loss_data,
         eval_metrics=eval_metrics,
     )
 
-    return svg_content
+    return report_content
