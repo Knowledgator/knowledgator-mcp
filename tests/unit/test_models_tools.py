@@ -46,7 +46,7 @@ async def test_list_models_all(mock_client_context):
     assert len(res["models"]) == 2
     assert res["models"][0]["id"] == "gliclass-v4-2b"
     assert "url" in res["models"][0]
-    assert res["models"][0]["url"] == "https://api.knowledgator.com/models/gliclass-v4-2b"
+    assert res["models"][0]["url"] == "https://platform.knowledgator.com/models/gliclass-v4-2b"
 
     mock_client.finetuning.list_models_async.assert_awaited_once_with(
         offset=0,
@@ -96,7 +96,7 @@ async def test_list_models_filter_adapters(mock_client_context):
 
     assert res["total"] == 1
     assert res["models"][0]["id"] == "custom-adapter-1"
-    assert res["models"][0]["url"] == "https://api.knowledgator.com/models/custom-adapter-1"
+    assert res["models"][0]["url"] == "https://platform.knowledgator.com/models/custom-adapter-1"
 
     mock_client.finetuning.list_models_async.assert_awaited_once_with(
         offset=10,
@@ -141,7 +141,7 @@ async def test_list_models_filter_full_models(mock_client_context):
 
     assert res["total"] == 1
     assert res["models"][0]["id"] == "gliner-multitask-v1-0"
-    assert res["models"][0]["url"] == "https://api.knowledgator.com/models/gliner-multitask-v1-0"
+    assert res["models"][0]["url"] == "https://platform.knowledgator.com/models/gliner-multitask-v1-0"
 
     mock_client.finetuning.list_models_async.assert_awaited_once_with(
         offset=0,
@@ -280,7 +280,7 @@ async def test_get_model_details_async(mock_client_context):
 
     assert res["id"] == "gliclass-small-v1-0"
     assert res["description"] == "Full README content"
-    assert res["url"] == "https://api.knowledgator.com/models/gliclass-small-v1-0"
+    assert res["url"] == "https://platform.knowledgator.com/models/gliclass-small-v1-0"
     mock_client.finetuning.get_model_async.assert_awaited_once_with(
         model_id="gliclass-small-v1-0",
         server_url=server_url,

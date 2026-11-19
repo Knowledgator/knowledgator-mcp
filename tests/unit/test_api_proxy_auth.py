@@ -66,7 +66,7 @@ def test_api_proxy_never_falls_back_to_server_static_key():
 
 def test_api_key_mode_env_fallback():
     """Verify self-hosted api_key mode relies on configured static API key."""
-    config = ServerConfig(auth_type="api_key", api_key="sk-env-static-key", base_url="https://api.knowledgator.com")
+    config = ServerConfig(auth_type="api_key", api_key="sk-env-static-key", base_url="https://api.platform.knowledgator.com")
     ctx = make_mock_context({"knowledgatorapi-key": "ignored_header_key"})
 
     client, server_url, headers = get_client_context(server_config=config, ctx=ctx)

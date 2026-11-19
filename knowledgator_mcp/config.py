@@ -19,7 +19,7 @@ class ServerConfig(BaseSettings):
     debug: bool = False
     auth_type: str = "api_key"
     api_key: Optional[str] = None
-    base_url: str = "https://api.knowledgator.com"
+    base_url: str = "https://api.platform.knowledgator.com"
     request_timeout_ms: int = 60000
     platform_frontend_url: str = "https://platform.knowledgator.com"
 

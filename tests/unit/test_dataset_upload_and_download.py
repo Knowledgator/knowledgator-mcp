@@ -93,7 +93,7 @@ async def test_upload_dataset_from_local_file(tmp_path):
             "name": "Shipping Reviews",
         }
         mock_client.datasets.create_async = mock_create
-        mock_ctx.return_value = (mock_client, "https://api.knowledgator.com", {"header": "val"})
+        mock_ctx.return_value = (mock_client, "https://api.platform.knowledgator.com", {"header": "val"})
 
         result = await upload_dataset(
             name="Shipping Reviews",
@@ -129,7 +129,7 @@ async def test_upload_dataset_from_json_string():
             "status": "ready",
         }
         mock_client.datasets.create_async = mock_create
-        mock_ctx.return_value = (mock_client, "https://api.knowledgator.com", {})
+        mock_ctx.return_value = (mock_client, "https://api.platform.knowledgator.com", {})
 
         result = await upload_dataset(
             name="String Test v2",
@@ -163,7 +163,7 @@ async def test_download_dataset_stateless_in_memory():
     with patch("knowledgator_mcp.tools.dataset_tools.get_client_context") as mock_ctx:
         mock_client = MagicMock()
         mock_client.datasets.download_async = AsyncMock(return_value=samples)
-        mock_ctx.return_value = (mock_client, "https://api.knowledgator.com", {"header": "val"})
+        mock_ctx.return_value = (mock_client, "https://api.platform.knowledgator.com", {"header": "val"})
 
         res = await download_dataset(dataset_id="stateless-uuid-123")
         assert res == samples
@@ -175,7 +175,7 @@ async def test_get_dataset_details_metadata():
     with patch("knowledgator_mcp.tools.dataset_tools.get_client_context") as mock_ctx:
         mock_client = MagicMock()
         mock_client.datasets.get.return_value = {"id": "disk-ds-uuid", "name": "DiskDataset"}
-        mock_ctx.return_value = (mock_client, "https://api.knowledgator.com", {})
+        mock_ctx.return_value = (mock_client, "https://api.platform.knowledgator.com", {})
 
         from knowledgator_mcp.tools.dataset_tools import get_dataset_details
         res = await get_dataset_details(dataset_id="disk-ds-uuid")
@@ -199,7 +199,7 @@ async def test_download_dataset_streaming_to_file(tmp_path):
         mock_datasets = MagicMock(spec=["stream_download_async"])
         mock_datasets.stream_download_async = fake_stream
         mock_client.datasets = mock_datasets
-        mock_ctx.return_value = (mock_client, "https://api.knowledgator.com", {})
+        mock_ctx.return_value = (mock_client, "https://api.platform.knowledgator.com", {})
 
         res = await download_dataset(
             dataset_id="stream-uuid-123",
@@ -222,7 +222,7 @@ async def test_upload_dataset_stateless_pass_through():
             "name": "Stateless Upload",
         }
         mock_client.datasets.create_async = mock_create
-        mock_ctx.return_value = (mock_client, "https://api.knowledgator.com", {})
+        mock_ctx.return_value = (mock_client, "https://api.platform.knowledgator.com", {})
 
         res = await upload_dataset(
             name="Stateless Upload",

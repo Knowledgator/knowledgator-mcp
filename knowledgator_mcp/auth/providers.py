@@ -95,7 +95,7 @@ def extract_key_from_ctx(ctx: Any) -> Optional[str]:
 class APIKeyAuthProvider(BaseAuthProvider):
     """Authentication provider using Knowledgator API key."""
 
-    def __init__(self, api_key: Optional[str] = None, base_url: str = "https://api.knowledgator.com"):
+    def __init__(self, api_key: Optional[str] = None, base_url: str = "https://api.platform.knowledgator.com"):
         self.api_key = api_key
         self.base_url = base_url
 
@@ -115,7 +115,7 @@ class APIProxyAuthProvider(BaseAuthProvider):
     def __init__(
         self,
         ctx: Any = None,
-        base_url: str = "https://api.knowledgator.com",
+        base_url: str = "https://api.platform.knowledgator.com",
     ):
         self.ctx = ctx
         self.base_url = base_url
