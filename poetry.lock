@@ -787,7 +787,7 @@ pydantic = ">=2.10.3"
 type = "git"
 url = "ssh://git@github.com/Knowledgator/knowledgator-sdk.py.git"
 reference = "main"
-resolved_reference = "7d31ba2d257fb66246ee20b72d5ac6023a785a9e"
+resolved_reference = "baba1b521eb78b70a74bc749f2347665701e06a9"
 
 [[package]]
 name = "markdown-it-py"
