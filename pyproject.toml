@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "knowledgator-mcp"
-version = "1.0.3"
+version = "1.0.4"
 description = "Python MCP server for the Knowledgator API"
 authors = ["Knowledgator <info@knowledgator.com>"]
 license = "Apache-2.0"
@@ -11,9 +11,14 @@ keywords = ["knowledgator", "mcp", "client"]
 classifiers = [
   "Programming Language :: Python",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "License :: OSI Approved :: Apache Software License",
-  "Topic :: Internet :: WWW/HTTP :: HTTP Client",
+  "Operating System :: OS Independent",
+  "Topic :: Internet :: WWW/HTTP",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 packages = [{include = "knowledgator_mcp"}]
 
@@ -25,8 +30,8 @@ python = "^3.11"
 mcp = ">=1.12.0,<2.0.0"
 pydantic = "^2.7.0"
 pydantic-settings = "^2.2.0"
-uvicorn = "^0.30.0"
-knowledgator = {git = "git@github.com:Knowledgator/knowledgator-sdk.py.git", branch = "main"}
+uvicorn = ">=0.30.0"
+knowledgator = "^1.0.3"
 
 [tool.poetry.group.ci.dependencies]
 dagger-io = "^0.13.0"
